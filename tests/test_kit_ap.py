@@ -209,6 +209,48 @@ class KitTest(unittest.TestCase):
            cwd=self.repo, env=self.env, inp="hello")
         self.assertTrue(os.path.exists(os.path.join(self.repo, "experiments/E001/conversation.jsonl")))
 
+    def _receipt(self, tag, gh=True):
+        """Run prereg-receipt with a stub `gh` that records the comment body; returns (body or None, stderr)."""
+        stub = os.path.join(self.tmp, "stubbin")
+        os.makedirs(stub, exist_ok=True)
+        out = os.path.join(self.tmp, "gh_body.txt")
+        with open(os.path.join(stub, "gh"), "w") as f:
+            f.write('#!/usr/bin/env bash\nwhile [ $# -gt 0 ]; do [ "$1" = "--body" ] && printf "%%s" "$2" > "%s"; shift; done\n' % out)
+        os.chmod(os.path.join(stub, "gh"), 0o755)
+        path = (stub + os.pathsep if gh else "") + "/usr/bin:/bin"
+        if os.path.exists(out):
+            os.remove(out)
+        r = sh("bash", ".agents/tools/prereg-receipt", tag, cwd=self.repo, env={**self.env, "PATH": path})
+        return (open(out).read() if os.path.exists(out) else None), r.stderr
+
+    def test_receipt_hashes_the_tagged_files_of_a_hyphenated_eid(self):
+        import hashlib
+        self.kit("init", "--source", self.src, "--modules", "experiment-pr-log")
+        d = os.path.join(self.repo, "experiments", "E01-stentor-map")
+        os.makedirs(d)
+        for name, text in (("PREREG.md", "prereg v1\n"), ("ENV.lock", "numpy==1.0\n")):
+            with open(os.path.join(d, name), "w") as f:
+                f.write(text)
+        sh("git", "add", "-A", cwd=self.repo)
+        sh("git", "commit", "-qm", "prereg", cwd=self.repo)
+        sh("git", "tag", "-a", "E01-stentor-map-prereg", "-m", "t", cwd=self.repo)
+        sh("git", "tag", "-a", "E01-stentor-map-interim-1", "-m", "t", cwd=self.repo)
+        sh("git", "tag", "-a", "model-v0.1.0", "-m", "t", cwd=self.repo)
+        with open(os.path.join(d, "PREREG.md"), "w") as f:            # a later working-tree edit must not leak in
+            f.write("edited after the tag\n")
+        want = hashlib.sha256(b"prereg v1\n").hexdigest()
+        for tag in ("E01-stentor-map-prereg", "E01-stentor-map-interim-1"):
+            body, _ = self._receipt(tag)
+            self.assertIn(want, body)
+            self.assertIn(hashlib.sha256(b"numpy==1.0\n").hexdigest(), body)
+            self.assertIn("experiment: E01-stentor-map", body)
+        body, _ = self._receipt("model-v0.1.0")
+        self.assertIn("none (not an experiment milestone tag)", body)
+        self.assertNotIn(want, body)
+        body, err = self._receipt("E01-stentor-map-prereg", gh=False)
+        self.assertIsNone(body)
+        self.assertIn("gh not found", err)
+
 
 if __name__ == "__main__":
     unittest.main()
