@@ -56,10 +56,10 @@ The name comes from `git config user.name`.
 
 This protocol is the `convo-log` module of KIT Adaptive Preregistration, installed by default:
 ```bash
-kit init /path/to/repo            # or, in a repo that already has KIT Adaptive Preregistration:
-.agents/bin/kit add convo-log
+kit_ap init /path/to/repo            # or, in a repo that already has KIT Adaptive Preregistration:
+.agents/bin/kit_ap add convo-log
 ```
-That installs `.agents/tools/convo-log`, this document, `.github/hooks/kit-convo-log.json` and the Claude Code hooks (merged into `.claude/settings.json`), and adds the agent instructions to the managed block in `AGENTS.md`.
+That installs `.agents/tools/convo-log`, this document, `.github/hooks/kit_ap-convo-log.json` and the Claude Code hooks (merged into `.claude/settings.json`), and adds the agent instructions to the managed block in `AGENTS.md`.
 
 Requirements: Python 3, git, and the GitHub CLI logged in (`brew install gh && gh auth login`).
 
@@ -74,7 +74,7 @@ git commit --allow-empty -m "start: <topic>" && git push -u origin HEAD && gh pr
 |---|---|---|
 | **Claude Code** | Hooks in `.claude/settings.json`: `UserPromptSubmit` → your prompt, `Stop` → `last_assistant_message`, `SessionEnd` → posts anything still waiting. | High |
 | **Codex CLI** | `notify` in `~/.codex/config.toml`. Each turn it passes your messages (`input-messages`) and the final reply (`last-assistant-message`). | High |
-| **Copilot / agents in VS Code** | Hooks (Preview) in `.github/hooks/kit-convo-log.json`: `UserPromptSubmit` → prompt, `Stop` → the reply, read from the transcript. The transcript format isn't a stable API, so the reply can be missed. | Medium |
+| **Copilot / agents in VS Code** | Hooks (Preview) in `.github/hooks/kit_ap-convo-log.json`: `UserPromptSubmit` → prompt, `Stop` → the reply, read from the transcript. The transcript format isn't a stable API, so the reply can be missed. | Medium |
 | **ChatGPT, Claude.ai, Gemini, any chat UI** | No hooks. Log by hand (below). | Manual |
 | **Any other agent** | The instructions in `AGENTS.md` tell it to run `convo-log add` each turn. | Low. Agents forget. |
 
