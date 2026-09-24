@@ -36,7 +36,7 @@ To change it, add an optional `.convo-log.json` at the repo root:
 ```
 Each key in `paths` is a regex matched against the branch name, and the first match wins. `{1}`, `{2}`… are the regex capture groups, and `{branch}` is the full branch name. Branches that match nothing go to `dir`.
 
-Other agentkit modules can add routes in `.agents/config/convo-log.d/*.json` (same format). For example, `experiment-pr-log` routes `experiment/<EID>` to `experiments/<EID>/conversation.jsonl`. Routes in the repo's own `.convo-log.json` match first.
+Other KIT Adaptive Preregistration modules can add routes in `.agents/config/convo-log.d/*.json` (same format). For example, `experiment-pr-log` routes `experiment/<EID>` to `experiments/<EID>/conversation.jsonl`. Routes in the repo's own `.convo-log.json` match first.
 
 Each line in the log:
 ```json
@@ -54,12 +54,12 @@ The name comes from `git config user.name`.
 
 ## 3. Install
 
-This protocol is the `convo-log` agentkit module, installed by default:
+This protocol is the `convo-log` module of KIT Adaptive Preregistration, installed by default:
 ```bash
-agentkit init /path/to/repo            # or, in a repo that already has agentkit:
-.agents/bin/agentkit add convo-log
+kit init /path/to/repo            # or, in a repo that already has KIT Adaptive Preregistration:
+.agents/bin/kit add convo-log
 ```
-That installs `.agents/tools/convo-log`, this document, `.github/hooks/agentkit-convo-log.json` and the Claude Code hooks (merged into `.claude/settings.json`), and adds the agent instructions to the managed block in `AGENTS.md`.
+That installs `.agents/tools/convo-log`, this document, `.github/hooks/kit-convo-log.json` and the Claude Code hooks (merged into `.claude/settings.json`), and adds the agent instructions to the managed block in `AGENTS.md`.
 
 Requirements: Python 3, git, and the GitHub CLI logged in (`brew install gh && gh auth login`).
 
@@ -74,7 +74,7 @@ git commit --allow-empty -m "start: <topic>" && git push -u origin HEAD && gh pr
 |---|---|---|
 | **Claude Code** | Hooks in `.claude/settings.json`: `UserPromptSubmit` → your prompt, `Stop` → `last_assistant_message`, `SessionEnd` → posts anything still waiting. | High |
 | **Codex CLI** | `notify` in `~/.codex/config.toml`. Each turn it passes your messages (`input-messages`) and the final reply (`last-assistant-message`). | High |
-| **Copilot / agents in VS Code** | Hooks (Preview) in `.github/hooks/agentkit-convo-log.json`: `UserPromptSubmit` → prompt, `Stop` → the reply, read from the transcript. The transcript format isn't a stable API, so the reply can be missed. | Medium |
+| **Copilot / agents in VS Code** | Hooks (Preview) in `.github/hooks/kit-convo-log.json`: `UserPromptSubmit` → prompt, `Stop` → the reply, read from the transcript. The transcript format isn't a stable API, so the reply can be missed. | Medium |
 | **ChatGPT, Claude.ai, Gemini, any chat UI** | No hooks. Log by hand (below). | Manual |
 | **Any other agent** | The instructions in `AGENTS.md` tell it to run `convo-log add` each turn. | Low. Agents forget. |
 

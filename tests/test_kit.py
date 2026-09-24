@@ -21,7 +21,7 @@ def git_init(path):
     sh("git", "config", "user.name", "Test", cwd=path)
 
 
-class AgentkitTest(unittest.TestCase):
+class KitTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.env = {**os.environ, "XDG_CACHE_HOME": os.path.join(self.tmp, "cache")}
@@ -42,10 +42,10 @@ class AgentkitTest(unittest.TestCase):
         return sh("git", "rev-parse", "HEAD", cwd=self.src).stdout.strip()
 
     def kit(self, *args, check=True):
-        return sh(sys.executable, os.path.join(KIT, "bin", "agentkit"), *args, cwd=self.repo, check=check, env=self.env)
+        return sh(sys.executable, os.path.join(KIT, "bin", "kit"), *args, cwd=self.repo, check=check, env=self.env)
 
     def vendored(self, *args, check=True):
-        return sh(sys.executable, os.path.join(self.repo, ".agents", "bin", "agentkit"), *args,
+        return sh(sys.executable, os.path.join(self.repo, ".agents", "bin", "kit"), *args,
                   cwd=self.repo, check=check, env=self.env)
 
     def read(self, rel):
@@ -66,16 +66,16 @@ class AgentkitTest(unittest.TestCase):
         lock = self.lock()
         self.assertEqual(lock["modules"], ["core", "convo-log"])
         self.assertEqual(lock["source"], self.src)
-        for rel in (".agents/bin/agentkit", ".agents/tools/convo-log", ".agents/protocols/CONVERSATIONS.md",
-                    ".agents/README.md", ".github/hooks/agentkit-core.json", ".github/hooks/agentkit-convo-log.json"):
+        for rel in (".agents/bin/kit", ".agents/tools/convo-log", ".agents/protocols/CONVERSATIONS.md",
+                    ".agents/README.md", ".github/hooks/kit-core.json", ".github/hooks/kit-convo-log.json"):
             self.assertTrue(os.path.exists(os.path.join(self.repo, rel)), rel)
         self.assertTrue(os.access(os.path.join(self.repo, ".agents/tools/convo-log"), os.X_OK))
         agents = self.read("AGENTS.md")
-        self.assertIn("<!-- agentkit:start -->", agents)
+        self.assertIn("<!-- kit:start -->", agents)
         self.assertIn("## Conversation logging", agents)
         self.assertTrue(self.read("CLAUDE.md").startswith("@AGENTS.md"))
         cmds = self.settings_commands()
-        self.assertTrue(any("agentkit\" check --hook" in c for c in cmds))
+        self.assertTrue(any("kit\" check --hook" in c for c in cmds))
         self.assertTrue(any(".agents/tools/convo-log" in c for c in cmds))
 
     def test_keeps_user_content_and_is_idempotent(self):
@@ -110,7 +110,7 @@ class AgentkitTest(unittest.TestCase):
         self.kit("remove", "experiment-pr-log", "convo-log")
         self.assertEqual(self.lock()["modules"], ["core"])
         self.assertFalse(os.path.exists(os.path.join(self.repo, ".agents/tools")))
-        self.assertFalse(os.path.exists(os.path.join(self.repo, ".github/hooks/agentkit-convo-log.json")))
+        self.assertFalse(os.path.exists(os.path.join(self.repo, ".github/hooks/kit-convo-log.json")))
         self.assertFalse(any("convo-log" in c or "prereg" in c for c in self.settings_commands()))
         self.assertNotIn("Conversation logging", self.read("AGENTS.md"))
 
@@ -123,7 +123,7 @@ class AgentkitTest(unittest.TestCase):
         out = self.vendored("check", check=False)
         self.assertIn("out of date", out.stdout)
         hook = self.vendored("check", "--hook")
-        self.assertIn("[agentkit]", hook.stdout)
+        self.assertIn("[kit]", hook.stdout)
         self.vendored("update")
         self.assertEqual(self.lock()["commit"], new)
         self.assertNotEqual(old, new)

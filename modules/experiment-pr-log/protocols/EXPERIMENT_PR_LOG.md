@@ -4,7 +4,7 @@
 **Depends on:** `.agents/protocols/CONVERSATIONS.md` + `.agents/tools/convo-log` (conversation capture) and, if used,
 `PREREG_PROTOCOL.md` (experiment IDs, tags). This document only defines *where* the record
 goes and *what* gets posted; it does not define preregistration itself.
-**Installed by:** the agentkit `experiment-pr-log` module, which also adds the one-line rule to `AGENTS.md`.
+**Installed by:** the KIT Adaptive Preregistration `experiment-pr-log` module, which also adds the one-line rule to `AGENTS.md`.
 
 ---
 

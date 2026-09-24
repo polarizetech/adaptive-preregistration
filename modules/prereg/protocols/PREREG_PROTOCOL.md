@@ -2,7 +2,7 @@
 
 **Applies to:** every LLM coding session and every human contributor in this repo.
 **Status of this file:** binding. If a task conflicts with it, stop and say so before doing the task.
-**Installed by:** the agentkit `prereg` module, which also adds the one-line rule to `AGENTS.md`.
+**Installed by:** the KIT Adaptive Preregistration `prereg` module, which also adds the one-line rule to `AGENTS.md`.
 
 Basis (adapted, not copied verbatim): Adaptive Preregistration for model-based research
 (Gould et al. 2025, *Methods Ecol Evol*, doi 10.1111/2041-210x.70311; Git guide at

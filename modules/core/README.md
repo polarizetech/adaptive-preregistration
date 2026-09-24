@@ -1,11 +1,11 @@
-# .agents — managed by agentkit
+# .agents — managed by KIT Adaptive Preregistration
 
-Everything in this folder was installed by [agentkit](https://github.com/polarizetech/kit-adaptive-preregistration) from the kit recorded in `kit.lock`.
+Everything in this folder was installed by [KIT Adaptive Preregistration](https://github.com/polarizetech/kit-adaptive-preregistration) from the kit recorded in `kit.lock`.
 Don't edit these files here. Updates overwrite them, and `update` refuses to run while they differ from what was installed.
 Change the kit instead, then pull the change in:
 
 ```bash
-.agents/bin/agentkit update           # pull the latest kit and re-apply
-.agents/bin/agentkit status           # installed version, modules, whether it's current
-.agents/bin/agentkit add <module>     # or: remove <module>
+.agents/bin/kit update           # pull the latest kit and re-apply
+.agents/bin/kit status           # installed version, modules, whether it's current
+.agents/bin/kit add <module>     # or: remove <module>
 ```

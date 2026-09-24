@@ -1,7 +1,7 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.agents/bin/agentkit\" check --hook", "timeout": 10 } ] }
+      { "hooks": [ { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.agents/bin/kit\" check --hook", "timeout": 10 } ] }
     ]
   }
 }

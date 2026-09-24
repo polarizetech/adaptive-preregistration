@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""agentkit — one set of agent protocols, installed into every repo, for every LLM tool.
+"""kit — the CLI for KIT Adaptive Preregistration: one set of agent protocols, installed into every repo, for every LLM tool.
 
 Installs protocol modules from this kit into a repo as committed, managed files:
   .agents/                     protocols, tools, this CLI, and kit.lock (source + commit + file hashes)
   AGENTS.md                    managed block of always-on instructions (Codex, Copilot, Cursor, Gemini, …)
   CLAUDE.md                    imports AGENTS.md so Claude Code reads the same rules
   .claude/settings.json        Claude Code hooks, merged into existing settings
-  .github/hooks/agentkit-*.json  Copilot / VS Code hooks
+  .github/hooks/kit-*.json  Copilot / VS Code hooks
 
 Usage:
-  agentkit list                                    modules in the kit
-  agentkit init [REPO] [--modules a,b] [--source URL|PATH] [--ref REF]
-  agentkit add MODULE... [--repo REPO]
-  agentkit remove MODULE... [--repo REPO]
-  agentkit update [REPO] [--ref REF] [--force]     pull the latest kit and re-apply
-  agentkit check [REPO] [--hook]                   out of date? managed files edited?
-  agentkit status [REPO]
+  kit list                                    modules in the kit
+  kit init [REPO] [--modules a,b] [--source URL|PATH] [--ref REF]
+  kit add MODULE... [--repo REPO]
+  kit remove MODULE... [--repo REPO]
+  kit update [REPO] [--ref REF] [--force]     pull the latest kit and re-apply
+  kit check [REPO] [--hook]                   out of date? managed files edited?
+  kit status [REPO]
 
 Stdlib only (Python 3.9+). Needs git.
 """
@@ -25,10 +25,10 @@ DEFAULT_SOURCE = "https://github.com/polarizetech/kit-adaptive-preregistration.g
 DEFAULT_REF = "main"
 AGENTS_DIR = ".agents"
 LOCK = os.path.join(AGENTS_DIR, "kit.lock")
-START, END = "<!-- agentkit:start -->", "<!-- agentkit:end -->"
+START, END = "<!-- kit:start -->", "<!-- kit:end -->"
 BLOCK_RE = re.compile(re.escape(START) + r".*?" + re.escape(END) + r"\n?", re.S)
 LEGACY_BLOCK_RE = re.compile(r"\n*<!-- convo-log:start -->.*?<!-- convo-log:end -->\n?", re.S)  # old install.sh
-MANAGED_CMD = re.compile(r"\.agents/(?:bin|tools)/|tools/convo-log")  # hook commands agentkit owns
+MANAGED_CMD = re.compile(r"\.agents/(?:bin|tools)/|tools/convo-log")  # hook commands kit owns
 MODULE_META = {"module.json", "instructions.md", "hooks"}  # module entries that are not vendored as files
 CHECK_TTL = 6 * 3600
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -100,7 +100,7 @@ def prune_empty(repo, rel_dir):
 
 
 def modified_files(repo, lock):
-    """Managed files whose content no longer matches what agentkit installed."""
+    """Managed files whose content no longer matches what kit installed."""
     out = []
     for rel, digest in sorted(((lock or {}).get("files") or {}).items()):
         p = os.path.join(repo, rel)
@@ -117,7 +117,7 @@ def is_kit(d):
 
 def cache_dir(source):
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    return os.path.join(base, "agentkit", re.sub(r"[^A-Za-z0-9._-]+", "_", source).strip("_"))
+    return os.path.join(base, "kit", re.sub(r"[^A-Za-z0-9._-]+", "_", source).strip("_"))
 
 
 def fetch(source, ref=DEFAULT_REF, commit=None):
@@ -163,7 +163,7 @@ def resolve(mods, wanted):
     order = []
     def visit(name, chain):
         if name not in mods:
-            raise Fail(f"unknown module: {name} (see `agentkit list`)")
+            raise Fail(f"unknown module: {name} (see `kit list`)")
         if name in order:
             return
         if name in chain:
@@ -241,8 +241,8 @@ def ensure_claude_import(repo):
 
 
 def render_block(mods, order, source):
-    parts = [START + f"\n<!-- Managed by agentkit ({source}). Don't edit between these markers: "
-                     "change the kit, then run `.agents/bin/agentkit update`. -->"]
+    parts = [START + f"\n<!-- Managed by KIT Adaptive Preregistration ({source}). Don't edit between these markers: "
+                     "change the kit, then run `.agents/bin/kit update`. -->"]
     for name in order:
         text = read_text(os.path.join(mods[name]["dir"], "instructions.md")).strip()
         if text:
@@ -261,7 +261,7 @@ def apply(kit, repo, wanted, force=False, ref=None):
         raise Fail("managed files were edited in this repo:\n  " + "\n  ".join(edited) +
                    "\nMove those changes into the kit (or outside .agents/), or re-run with --force to overwrite them.")
 
-    files = {os.path.join(AGENTS_DIR, "bin", "agentkit"): os.path.join(kit, "bin", "agentkit")}
+    files = {os.path.join(AGENTS_DIR, "bin", "kit"): os.path.join(kit, "bin", "kit")}
     claude_hooks = {}
     for name in order:
         m = mods[name]
@@ -271,7 +271,7 @@ def apply(kit, repo, wanted, force=False, ref=None):
             files[dest] = src
         copilot = os.path.join(m["dir"], "hooks", "copilot.json")
         if os.path.exists(copilot):
-            files[os.path.join(".github", "hooks", f"agentkit-{name}.json")] = copilot
+            files[os.path.join(".github", "hooks", f"kit-{name}.json")] = copilot
         for event, groups in (read_json(os.path.join(m["dir"], "hooks", "claude.json"), {}).get("hooks") or {}).items():
             claude_hooks.setdefault(event, []).extend(groups)
 
@@ -299,7 +299,7 @@ def apply(kit, repo, wanted, force=False, ref=None):
         "commit": info["commit"], "dirty": info["dirty"], "modules": order, "files": hashes})
 
     short = (info["commit"] or "")[:7] + (" (uncommitted kit changes)" if info["dirty"] else "")
-    print(f"agentkit: {repo} now at {short}; modules: {', '.join(order)}")
+    print(f"kit: {repo} now at {short}; modules: {', '.join(order)}")
     for name in order:
         if name not in (old.get("modules") or []):
             for note in mods[name].get("notes", []):
@@ -314,7 +314,7 @@ def run_apply(kit, repo, modules, force=False, ref=None):
     """Apply with the kit's own CLI, so a newer kit installs itself with its own logic."""
     if os.path.realpath(kit) == HERE:
         return apply(kit, repo, modules, force, ref)
-    cmd = [sys.executable, os.path.join(kit, "bin", "agentkit"), "_apply", repo, "--kit", kit,
+    cmd = [sys.executable, os.path.join(kit, "bin", "kit"), "_apply", repo, "--kit", kit,
            "--modules", ",".join(modules)] + (["--force"] if force else []) + (["--ref", ref] if ref else [])
     code = subprocess.run(cmd).returncode
     if code:
@@ -331,14 +331,14 @@ def installed_kit(lock):
 def require_lock(repo):
     lock = read_lock(repo)
     if not lock:
-        raise Fail(f"agentkit is not installed in {repo}; run `agentkit init` first")
+        raise Fail(f"kit is not installed in {repo}; run `kit init` first")
     return lock
 
 
 def latest_commit(repo, lock, use_cache):
     ref = lock.get("ref", DEFAULT_REF)
     _, gd, _ = git("rev-parse", "--git-common-dir", cwd=repo)
-    cache = os.path.join(repo, gd or ".git", "agentkit-check.json")
+    cache = os.path.join(repo, gd or ".git", "kit-check.json")
     key = f"{lock['source']}#{ref}"
     c = read_json(cache, {})
     if use_cache and c.get("key") == key and time.time() - c.get("ts", 0) < CHECK_TTL:
@@ -372,7 +372,7 @@ def cmd_list(a):
 def cmd_init(a):
     repo = repo_root(a.repo)
     if read_lock(repo) and not a.force:
-        raise Fail("agentkit is already installed here; use `add`, `remove` or `update` (or --force)")
+        raise Fail("kit is already installed here; use `add`, `remove` or `update` (or --force)")
     kit = fetch(a.source, a.ref or DEFAULT_REF) if a.source else HERE if is_kit(HERE) else fetch(DEFAULT_SOURCE, a.ref or DEFAULT_REF)
     wanted = [m for m in a.modules.split(",") if m] if a.modules is not None else \
         [n for n, m in load_modules(kit).items() if m.get("default")]
@@ -408,7 +408,7 @@ def cmd_update(a):
     new = kit_info(kit)["commit"]
     if new == lock.get("commit") and not lock.get("dirty") and not a.force:
         edited = modified_files(repo, lock)
-        print("agentkit: already up to date" + (f"; edited managed files: {', '.join(edited)}" if edited else ""))
+        print("kit: already up to date" + (f"; edited managed files: {', '.join(edited)}" if edited else ""))
         return
     run_apply(kit, repo, lock["modules"], a.force, ref)
 
@@ -429,16 +429,16 @@ def cmd_check(a):
     installed = (lock.get("commit") or "")[:7]
     if latest and latest != lock.get("commit"):
         msgs.append(f"protocols are out of date (installed {installed}, latest {latest[:7]}); "
-                    "`.agents/bin/agentkit update` pulls them.")
+                    "`.agents/bin/kit update` pulls them.")
     elif lock.get("dirty"):
         msgs.append(f"installed from a kit checkout with uncommitted changes ({installed}); run update once they're pushed.")
     if a.hook:
         if msgs:
-            print("[agentkit] " + " ".join(msgs) + " Mention this to the user once; don't update without their go-ahead.")
+            print("[kit] " + " ".join(msgs) + " Mention this to the user once; don't update without their go-ahead.")
         return 0
     if latest is None:
         msgs.append(f"couldn't reach {lock['source']} to check for updates.")
-    print("\n".join(f"agentkit: {m}" for m in msgs) or f"agentkit: up to date ({installed})")
+    print("\n".join(f"kit: {m}" for m in msgs) or f"kit: up to date ({installed})")
     return 1 if msgs else 0
 
 
@@ -457,7 +457,7 @@ def cmd_apply(a):
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="agentkit", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(prog="kit", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("list", help="modules in the kit"); p.add_argument("--source"); p.set_defaults(fn=cmd_list)
     p = sub.add_parser("init", help="install into a repo")
@@ -484,7 +484,7 @@ def main():
     except Fail as e:
         if getattr(a, "hook", False):
             sys.exit(0)
-        print(f"agentkit: {e}", file=sys.stderr)
+        print(f"kit: {e}", file=sys.stderr)
         sys.exit(1)
 
 

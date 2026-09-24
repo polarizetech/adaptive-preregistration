@@ -44,7 +44,7 @@ def config(root):
     """Optional .convo-log.json at the repo root:
     {"dir": "conversations",                                   # default log folder
      "paths": {"^creation/(.+)$": "creations/{1}/conversation.jsonl"}}  # branch regex -> log path
-    agentkit modules may add routes in .agents/config/convo-log.d/*.json; the repo's own routes match first.
+    KIT Adaptive Preregistration modules may add routes in .agents/config/convo-log.d/*.json; the repo's own routes match first.
     """
     cfg = {"paths": {}}
     files = [os.path.join(root, ".convo-log.json")]
