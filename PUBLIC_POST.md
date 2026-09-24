@@ -6,10 +6,8 @@ The kit is described publicly in a polarize.tech blog post. When the kit changes
 |---|---|
 | Site repo | `polarizetech/polarize.tech`, checked out at `~/Sites/polarize.tech` |
 | Post (slug) | `adaptive-preregistration-when-an-agent-runs-the-model` |
-| While a draft | `_drafts/adaptive-preregistration-when-an-agent-runs-the-model.md` |
-| Once published | `_posts/<date>-adaptive-preregistration-when-an-agent-runs-the-model.md` |
-
-Find it with `ls ~/Sites/polarize.tech/_{drafts,posts}/*adaptive-preregistration-when-an-agent-runs-the-model*`.
+| File | `_posts/2026-09-24-adaptive-preregistration-when-an-agent-runs-the-model.md` (published 2026-09-24) |
+| Live | https://polarize.tech/blog/adaptive-preregistration-when-an-agent-runs-the-model/ |
 
 ## When the post needs updating
 
@@ -29,20 +27,19 @@ Update the post if the change alters any of these: a rule, a tag or file name, w
 Work in `~/Sites/polarize.tech` and follow its `CLAUDE.md`. It governs over this file.
 
 1. **Keep to that site's rules.** The post is tier `A`, `project: method`, with no claims or citations. Don't add author names, years or DOIs in prose; its gate rejects them. A source can only be cited once it is in the research ledger, by key.
-2. **Still a draft:** edit it in place.
-3. **Already published:** never change a published statement silently. Update the text so it describes the kit as it now is, and add a dated note at the end of the post saying what changed:
+2. **It is published,** so never change a published statement silently. Update the text so it describes the kit as it now is, and add a dated note at the end of the post saying what changed:
    ```markdown
    ## Update — 2026-10-02
    The kit now also does X; the section on Y was revised to match. Previously it said Z.
    ```
    If the post was wrong when published, as opposed to the kit having changed since, write `## Correction — <date>` instead. That repo requires correction notes for errors.
-4. **Run its gates** and fix anything they report for this post:
+3. **Run its gates** and fix anything they report for this post:
    ```bash
    cd ~/Sites/polarize.tech
    python3 scripts/validate_posts.py --drafts
    python3 scripts/check_design.py
    ```
-5. **Commit there** with a message that names the kit commit it tracks, for example `Post: update adaptive-preregistration post for kit_ap bc00df1`.
-6. **Don't push or publish without the user's go-ahead.** Pushing polarize.tech's `main` publishes the site. Moving a draft into `_posts/` is also the user's call.
+4. **Commit there** with a message that names the kit commit it tracks, for example `Post: update adaptive-preregistration post for kit_ap bc00df1`.
+5. **Don't push or publish without the user's go-ahead.** Pushing polarize.tech's `main` publishes the site.
 
 In the kit commit that made the change, say whether the post was updated. If it wasn't, say why.
