@@ -23,7 +23,8 @@ def git_init(path):
     sh("git", "config", "user.name", "Test", cwd=path)
 
 
-class KitTest(unittest.TestCase):
+class KitBase(unittest.TestCase):
+    """A committed copy of the kit (the \"remote\") and an empty project repo, plus helpers."""
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.env = {**os.environ, "XDG_CACHE_HOME": os.path.join(self.tmp, "cache")}
@@ -61,12 +62,19 @@ class KitTest(unittest.TestCase):
         s = json.loads(self.read(".claude/settings.json"))
         return [h["command"] for groups in s.get("hooks", {}).values() for g in groups for h in g["hooks"]]
 
-    # ------------------------------------------------------------------ tests
+    def log(self):
+        return sh("git", "log", "--format=%s", cwd=self.repo, check=False).stdout.split("\n")
+
+    def committed(self):
+        return sh("git", "show", "--name-only", "--format=", "HEAD", cwd=self.repo).stdout.split()
+
+
+class KitTest(KitBase):
 
     def test_init_installs_defaults(self):
         self.kit("init", "--source", self.src)
         lock = self.lock()
-        self.assertEqual(lock["modules"], ["core", "convo-log"])
+        self.assertEqual(lock["modules"], ["core", "convo-log", "prereg"])
         self.assertEqual(lock["source"], self.src)
         for rel in (".agents/bin/kit_ap", ".agents/tools/convo-log", ".agents/protocols/CONVERSATIONS.md",
                     ".agents/README.md", ".github/hooks/kit_ap-core.json", ".github/hooks/kit_ap-convo-log.json"):
@@ -94,8 +102,8 @@ class KitTest(unittest.TestCase):
         self.assertIn("Claude-only note.", snapshot["CLAUDE.md"])
         self.assertIn("say done", self.settings_commands())
         self.assertEqual(json.loads(snapshot[".claude/settings.json"])["model"], "opus")
-        self.kit("add", "prereg")
-        self.kit("remove", "prereg")
+        self.kit("add", "experiment-pr-log")
+        self.kit("remove", "experiment-pr-log")
         for p, text in snapshot.items():
             self.assertEqual(self.read(p), text, p)
 
@@ -160,12 +168,6 @@ class KitTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.repo, ".github/hooks/convo-log.json")))
         self.assertFalse(any("/tools/convo-log" in c and ".agents" not in c for c in self.settings_commands()))
 
-    def log(self):
-        return sh("git", "log", "--format=%s", cwd=self.repo, check=False).stdout.split("\n")
-
-    def committed(self):
-        return sh("git", "show", "--name-only", "--format=", "HEAD", cwd=self.repo).stdout.split()
-
     def test_commits_only_its_own_files(self):
         with open(os.path.join(self.repo, "work.txt"), "w") as f:
             f.write("unrelated work\n")
@@ -182,11 +184,11 @@ class KitTest(unittest.TestCase):
         self.assertIn("A  work.txt", status)      # still staged, not committed
         self.assertIn("?? notes.txt", status)
         self.assertNotIn(".agents", status)       # everything kit_ap wrote is committed
-        self.kit("add", "prereg")
-        self.assertEqual(self.log()[0], "Add KIT Adaptive Preregistration module: prereg")
-        self.kit("remove", "prereg")
-        self.assertEqual(self.log()[0], "Remove KIT Adaptive Preregistration module: prereg")
-        self.assertIn(".agents/protocols/PREREG_PROTOCOL.md", self.committed())  # the deletion is committed
+        self.kit("add", "experiment-pr-log")
+        self.assertEqual(self.log()[0], "Add KIT Adaptive Preregistration module: experiment-pr-log")
+        self.kit("remove", "experiment-pr-log")
+        self.assertEqual(self.log()[0], "Remove KIT Adaptive Preregistration module: experiment-pr-log")
+        self.assertIn(".agents/protocols/EXPERIMENT_PR_LOG.md", self.committed())  # the deletion is committed
 
     def test_update_commits(self):
         self.kit("init", "--source", self.src)
@@ -215,7 +217,8 @@ class KitTest(unittest.TestCase):
         os.makedirs(stub, exist_ok=True)
         out = os.path.join(self.tmp, "gh_body.txt")
         with open(os.path.join(stub, "gh"), "w") as f:
-            f.write('#!/usr/bin/env bash\nwhile [ $# -gt 0 ]; do [ "$1" = "--body" ] && printf "%%s" "$2" > "%s"; shift; done\n' % out)
+            f.write("#!/usr/bin/env bash\n"
+                    f'while [ $# -gt 0 ]; do [ "$1" = "--body" ] && printf "%s" "$2" > "{out}"; shift; done\n')
         os.chmod(os.path.join(stub, "gh"), 0o755)
         path = (stub + os.pathsep if gh else "") + "/usr/bin:/bin"
         if os.path.exists(out):
@@ -224,7 +227,10 @@ class KitTest(unittest.TestCase):
         if not gh:                     # hide any real gh in the fallback locations too
             env["HOME"] = self.tmp
         r = sh("bash", ".agents/tools/prereg-receipt", tag, cwd=self.repo, env=env)
-        return (open(out).read() if os.path.exists(out) else None), r.stderr
+        if not os.path.exists(out):
+            return None, r.stderr
+        with open(out) as f:
+            return f.read(), r.stderr
 
     def test_receipt_hashes_the_tagged_files_of_a_hyphenated_eid(self):
         import hashlib
@@ -263,8 +269,10 @@ class KitTest(unittest.TestCase):
         os.makedirs(stub)
         calls = os.path.join(self.tmp, "gh_calls.txt")
         with open(os.path.join(stub, "gh"), "w") as f:
-            f.write('#!/usr/bin/env bash\necho "$@" >> "%s"\n'
-                    'if [ "$1 $2" = "pr view" ]; then echo \'{"number": 7, "url": "u"}\'; else echo "https://x/pull/7#c1"; fi\n' % calls)
+            f.write("#!/usr/bin/env bash\n"
+                    f'echo "$@" >> "{calls}"\n'
+                    'if [ "$1 $2" = "pr view" ]; then echo \'{"number": 7, "url": "u"}\'; '
+                    'else echo "https://x/pull/7#c1"; fi\n')
         os.chmod(os.path.join(stub, "gh"), 0o755)
         env = {**self.env, "PATH": "/usr/bin:/bin", "HOME": home}
         for role, text in (("user", "hi"), ("assistant", "hello")):
@@ -272,12 +280,120 @@ class KitTest(unittest.TestCase):
                cwd=self.repo, env=env, inp=text)
         r = sh(sys.executable, ".agents/tools/convo-log", "sync", cwd=self.repo, env=env)
         self.assertTrue(os.path.exists(calls), r.stderr)
-        self.assertIn("pr comment 7", open(calls).read())
+        with open(calls) as f:
+            self.assertIn("pr comment 7", f.read())
         env["HOME"] = os.path.join(self.tmp, "nohome")
         sh(sys.executable, ".agents/tools/convo-log", "add", "--role", "user", "--tool", "test", "--no-sync",
            cwd=self.repo, env=env, inp="again")
         r = sh(sys.executable, ".agents/tools/convo-log", "sync", "--flush", cwd=self.repo, env=env)
         self.assertIn("gh not found", r.stderr)
+
+
+
+class SafetyTest(KitBase):
+    """Failure modes a reviewer found: every one must leave the repo untouched or fail loudly."""
+
+    def status(self):
+        return sh("git", "status", "--porcelain", "--untracked-files=all", cwd=self.repo).stdout
+
+    def write(self, rel, text):
+        path = os.path.join(self.repo, rel)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w") as f:
+            f.write(text)
+
+    def test_damaged_markers_refuse_instead_of_deleting_text(self):
+        self.write("AGENTS.md", "# Proj\n\n<!-- kit_ap:start -->\nold block, end marker lost\n\nImportant user notes.\n")
+        r = self.kit("init", "--source", self.src, check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("marker", r.stderr)
+        self.assertIn("Important user notes.", self.read("AGENTS.md"))
+        self.assertFalse(os.path.exists(os.path.join(self.repo, ".agents")))
+
+    def test_unparseable_settings_leave_nothing_half_installed(self):
+        self.write(".claude/settings.json", "{ not json")
+        r = self.kit("init", "--source", self.src, check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, ".agents")))
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "AGENTS.md")))
+
+    def test_existing_unmanaged_file_is_not_overwritten_without_force(self):
+        self.write(".agents/README.md", "my own notes\n")
+        r = self.kit("init", "--source", self.src, check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn(".agents/README.md", r.stderr)
+        self.assertEqual(self.read(".agents/README.md"), "my own notes\n")
+        self.kit("init", "--source", self.src, "--force")
+        self.assertNotEqual(self.read(".agents/README.md"), "my own notes\n")
+
+    def test_gitignored_claude_dir_still_commits_the_rest(self):
+        self.write(".gitignore", ".claude/\n")
+        sh("git", "add", ".gitignore", cwd=self.repo)
+        sh("git", "commit", "-qm", "ignore", cwd=self.repo)
+        self.kit("init", "--source", self.src)
+        self.assertIn(".agents/bin/kit_ap", self.committed())
+        self.assertEqual(self.status(), "")  # nothing left staged or dangling
+
+    def test_reinit_keeps_installed_modules(self):
+        self.kit("init", "--source", self.src, "--modules", "prereg")
+        self.kit("init", "--source", self.src, "--force")
+        self.assertIn("prereg", self.lock()["modules"])
+
+    def test_follow_a_tag(self):
+        sh("git", "tag", "-a", "v0.1.0", "-m", "v0.1.0", cwd=self.src)
+        tagged = sh("git", "rev-parse", "HEAD", cwd=self.src).stdout.strip()
+        self.kit("init", "--source", self.src, "--ref", "v0.1.0")
+        self.assertEqual(self.lock()["commit"], tagged)
+        self.assertEqual(self.lock()["ref"], "v0.1.0")
+        self.assertIn("up to date", self.vendored("check").stdout)
+        with open(os.path.join(self.src, "modules/core/instructions.md"), "a") as f:
+            f.write("\n- Later rule.\n")
+        self.commit_src("after the tag")  # main moves on; the tag doesn't
+        self.assertIn("up to date", self.vendored("check").stdout)
+
+    def test_hook_check_never_fails(self):
+        self.kit("init", "--source", self.src)
+        self.write(".agents/kit_ap.lock", "{}")  # damaged lock
+        r = self.vendored("check", "--hook", check=False)
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+
+
+class RedactionTest(unittest.TestCase):
+    """convo-log posts to PRs that may be public, so credentials must not survive."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.machinery, importlib.util
+        loader = importlib.machinery.SourceFileLoader("convo_log", os.path.join(KIT, "modules/convo-log/tools/convo-log"))
+        spec = importlib.util.spec_from_loader("convo_log", loader)
+        cls.mod = importlib.util.module_from_spec(spec)
+        loader.exec_module(cls.mod)
+
+    SECRETS = {
+        "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY": "wJalrXUtnFEMI",
+        "DATABASE_PASSWORD=hunter2hunter2": "hunter2",
+        "Authorization: Bearer abcdef0123456789abcdef": "abcdef0123456789",
+        "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl": "eyJhbGci",
+        "sk_live_abcdefghijklmnop1234": "abcdefghijklmnop",
+        "AIzaSyA1234567890abcdefghijklmnopqrstuv": "AIzaSy",
+        "postgres://admin:s3cretpw@db.example.com/x": "s3cretpw",
+        'api_key: "a b c d e"': "a b c d e",
+        "ghp_abcdefghijklmnopqrstuvwxyz0123456789": "ghp_",
+        "hf_abcdefghijklmnopqrstuvwxyzABCDEF": "hf_abc",
+        "sk-ant-api03-abcdefghijklmnopqrstuvwx": "api03",
+    }
+
+    def test_secrets_are_redacted(self):
+        for text, secret in self.SECRETS.items():
+            with self.subTest(text=text):
+                out = self.mod.redact(text)
+                self.assertNotIn(secret, out)
+                self.assertIn("[redacted]", out)
+
+    def test_ordinary_prose_is_left_alone(self):
+        for text in ("the token budget is 10", "set a password policy", "secret: tbd", "see https://example.com/a:b@c"):
+            with self.subTest(text=text):
+                self.assertEqual(self.mod.redact(text), text)
 
 
 if __name__ == "__main__":
