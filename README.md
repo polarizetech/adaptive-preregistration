@@ -2,6 +2,8 @@
 
 One set of protocols for how LLM agents work in my repos, written once here and installed into every project. It works with Claude Code, Codex, Copilot (VS Code and the coding agent), Cursor, Gemini, and plain chat tools.
 
+The method behind it is written up in [Adaptive preregistration: predict first, then run the code](https://polarize.tech/blog/adaptive-preregistration-predict-first-then-run-the-code/).
+
 A project doesn't link to this repo at runtime. Its CLI, `kit_ap`, **copies** the protocols into the project (`.agents/`) and records the exact kit commit in a lockfile. One command pulls the latest version. Agents always read files that are really in the repo, so the protocols also work in cloud sandboxes, offline, and for collaborators.
 
 ```
@@ -16,7 +18,7 @@ modules/experiment-pr-log/                  .claude/settings.json, .github/hooks
 ## Quick start
 
 ```bash
-git clone git@github.com:polarizetech/kit-adaptive-preregistration.git ~/Sites/kit-adaptive-preregistration
+git clone https://github.com/polarizetech/kit-adaptive-preregistration.git ~/Sites/kit-adaptive-preregistration
 cd /path/to/project
 ~/Sites/kit-adaptive-preregistration/bin/kit_ap init          # core + default modules, committed
 ```
