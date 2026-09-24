@@ -1,0 +1,63 @@
+cff-version: 1.2.0
+message: "If you use or adapt this protocol or software, please cite it as below."
+title: "KIT Adaptive Preregistration"
+abstract: >-
+  A protocol for adaptive preregistration of simulations and research software, and kit_ap, a CLI that
+  installs it into git repositories: predictions and pass criteria are fixed and tagged before any citable
+  run, plan changes are logged with whether the outcome was known, and failures close a version rather
+  than edit it.
+type: software
+authors:
+  - family-names: Anderton
+    given-names: Joshua
+version: 0.1.0
+date-released: "2026-09-24"
+license:
+  - MIT
+  - CC-BY-4.0
+repository-code: "https://github.com/polarizetech/kit-adaptive-preregistration"
+url: "https://polarize.tech/blog/adaptive-preregistration-predict-first-then-run-the-code/"
+keywords:
+  - preregistration
+  - adaptive preregistration
+  - reproducibility
+  - simulation
+  - research software
+  - model-based research
+references:
+  - type: article
+    title: "'But I can't preregister my research': Improving the reproducibility and transparency of ecology and conservation with adaptive preregistration for model-based research"
+    authors:
+      - family-names: Gould
+        given-names: Elliot
+      - name: "and others"
+    journal: "Methods in Ecology and Evolution"
+    year: 2026
+    volume: 17
+    issue: 6
+    start: 1768
+    end: 1787
+    doi: "10.1111/2041-210x.70311"
+  - type: article
+    title: "Best Laid Plans: A Guide to Reporting Preregistration Deviations"
+    authors:
+      - family-names: Willroth
+        given-names: Emily C.
+      - family-names: Atherton
+        given-names: Olivia E.
+    journal: "Advances in Methods and Practices in Psychological Science"
+    year: 2024
+    volume: 7
+    issue: 1
+    doi: "10.1177/25152459231213802"
+  - type: article
+    title: "The Really Risky Registered Modeling Report: Incentivizing Strong Tests and HONEST Modeling in Cognitive Science"
+    authors:
+      - family-names: Vanpaemel
+        given-names: Wolf
+    journal: "Computational Brain & Behavior"
+    year: 2019
+    volume: 2
+    start: 218
+    end: 222
+    doi: "10.1007/s42113-019-00056-9"

@@ -1,0 +1,11 @@
+# The CLI and tools are single-file scripts without a .py suffix; lint them explicitly.
+line-length = 130
+target-version = "py39"
+extend-include = ["bin/kit_ap", "modules/convo-log/tools/convo-log"]
+
+[lint]
+select = ["E", "F", "W", "B", "UP"]
+ignore = [
+  "E401",   # one-line stdlib imports are the house style for these single-file tools
+  "UP015",  # explicit open() modes are kept for readability
+]
