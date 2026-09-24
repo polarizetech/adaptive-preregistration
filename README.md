@@ -16,8 +16,8 @@ modules/experiment-pr-log/                  .claude/settings.json, .github/hooks
 ## Quick start
 
 ```bash
-git clone git@github.com:polarizetech/agentkit.git ~/Sites/agentkit
-~/Sites/agentkit/bin/agentkit init /path/to/project          # core + default modules
+git clone git@github.com:polarizetech/kit-adaptive-preregistration.git ~/Sites/kit-adaptive-preregistration
+~/Sites/kit-adaptive-preregistration/bin/agentkit init /path/to/project          # core + default modules
 cd /path/to/project && git add .agents AGENTS.md CLAUDE.md .claude .github && git commit -m "Add agentkit"
 ```
 

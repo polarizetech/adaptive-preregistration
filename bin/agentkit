@@ -21,7 +21,7 @@ Stdlib only (Python 3.9+). Needs git.
 """
 import argparse, glob, hashlib, json, os, re, shutil, subprocess, sys, time
 
-DEFAULT_SOURCE = "https://github.com/polarizetech/agentkit.git"
+DEFAULT_SOURCE = "https://github.com/polarizetech/kit-adaptive-preregistration.git"
 DEFAULT_REF = "main"
 AGENTS_DIR = ".agents"
 LOCK = os.path.join(AGENTS_DIR, "kit.lock")
