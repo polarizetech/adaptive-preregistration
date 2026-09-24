@@ -220,7 +220,10 @@ class KitTest(unittest.TestCase):
         path = (stub + os.pathsep if gh else "") + "/usr/bin:/bin"
         if os.path.exists(out):
             os.remove(out)
-        r = sh("bash", ".agents/tools/prereg-receipt", tag, cwd=self.repo, env={**self.env, "PATH": path})
+        env = {**self.env, "PATH": path}
+        if not gh:                     # hide any real gh in the fallback locations too
+            env["HOME"] = self.tmp
+        r = sh("bash", ".agents/tools/prereg-receipt", tag, cwd=self.repo, env=env)
         return (open(out).read() if os.path.exists(out) else None), r.stderr
 
     def test_receipt_hashes_the_tagged_files_of_a_hyphenated_eid(self):
@@ -250,6 +253,31 @@ class KitTest(unittest.TestCase):
         body, err = self._receipt("E01-stentor-map-prereg", gh=False)
         self.assertIsNone(body)
         self.assertIn("gh not found", err)
+
+    def test_convo_log_finds_gh_off_path(self):
+        """A hook's PATH often lacks ~/.local/bin; convo-log must still find gh there instead of queueing forever."""
+        self.kit("init", "--source", self.src, "--modules", "experiment-pr-log")
+        sh("git", "checkout", "-qb", "experiment/E002", cwd=self.repo)
+        home = os.path.join(self.tmp, "home")
+        stub = os.path.join(home, ".local", "bin")
+        os.makedirs(stub)
+        calls = os.path.join(self.tmp, "gh_calls.txt")
+        with open(os.path.join(stub, "gh"), "w") as f:
+            f.write('#!/usr/bin/env bash\necho "$@" >> "%s"\n'
+                    'if [ "$1 $2" = "pr view" ]; then echo \'{"number": 7, "url": "u"}\'; else echo "https://x/pull/7#c1"; fi\n' % calls)
+        os.chmod(os.path.join(stub, "gh"), 0o755)
+        env = {**self.env, "PATH": "/usr/bin:/bin", "HOME": home}
+        for role, text in (("user", "hi"), ("assistant", "hello")):
+            sh(sys.executable, ".agents/tools/convo-log", "add", "--role", role, "--tool", "test", "--no-sync",
+               cwd=self.repo, env=env, inp=text)
+        r = sh(sys.executable, ".agents/tools/convo-log", "sync", cwd=self.repo, env=env)
+        self.assertTrue(os.path.exists(calls), r.stderr)
+        self.assertIn("pr comment 7", open(calls).read())
+        env["HOME"] = os.path.join(self.tmp, "nohome")
+        sh(sys.executable, ".agents/tools/convo-log", "add", "--role", "user", "--tool", "test", "--no-sync",
+           cwd=self.repo, env=env, inp="again")
+        r = sh(sys.executable, ".agents/tools/convo-log", "sync", "--flush", cwd=self.repo, env=env)
+        self.assertIn("gh not found", r.stderr)
 
 
 if __name__ == "__main__":
