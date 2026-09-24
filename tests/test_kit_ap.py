@@ -5,6 +5,8 @@ Run: python3 -m unittest discover tests
 import json, os, shutil, subprocess, sys, tempfile, unittest
 
 KIT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Keep the developer's global git config (commit signing, credential helpers) out of the tests.
+os.environ.update({"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"})
 
 
 def sh(*cmd, cwd=None, check=True, env=None, inp=""):

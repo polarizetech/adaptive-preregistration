@@ -7,4 +7,5 @@ This repo is the source of the agent protocols that other repos install. Read `R
 - `bin/kit_ap` and the module tools use stdlib Python 3.9+ or POSIX shell only, and must work on macOS and Linux. Hooks and tools must never block an agent: on failure they warn and exit 0.
 - Keep installs backward compatible. An old vendored `.agents/bin/kit_ap` runs `update`, then hands off to the new kit's CLI through `_apply`. Don't change the `update` → `_apply` interface or the `kit_ap.lock` fields without handling older locks.
 - Run `python3 -m unittest discover tests` before committing. Add a test for any new install behaviour.
+- The kit is described in a public polarize.tech blog post. A change here that alters what the post says (rules, tag or file names, what a tool or hook does, supported tools, defaults, limits) must update the post in the same piece of work. See `PUBLIC_POST.md` for where it is and how to update it without breaking that site's rules. Never push or publish the site without the user's go-ahead.
 - Don't install KIT Adaptive Preregistration into this repo itself. The kit is the source, not a consumer.
