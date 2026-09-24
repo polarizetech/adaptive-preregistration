@@ -158,6 +158,48 @@ class KitTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.repo, ".github/hooks/convo-log.json")))
         self.assertFalse(any("/tools/convo-log" in c and ".agents" not in c for c in self.settings_commands()))
 
+    def log(self):
+        return sh("git", "log", "--format=%s", cwd=self.repo, check=False).stdout.split("\n")
+
+    def committed(self):
+        return sh("git", "show", "--name-only", "--format=", "HEAD", cwd=self.repo).stdout.split()
+
+    def test_commits_only_its_own_files(self):
+        with open(os.path.join(self.repo, "work.txt"), "w") as f:
+            f.write("unrelated work\n")
+        sh("git", "add", "work.txt", cwd=self.repo)
+        with open(os.path.join(self.repo, "notes.txt"), "w") as f:
+            f.write("untracked\n")
+        self.kit("init", "--source", self.src)  # first commit in a repo with no commits yet
+        self.assertEqual(self.log()[0], "Add KIT Adaptive Preregistration")
+        files = self.committed()
+        self.assertIn(".agents/bin/kit_ap", files)
+        self.assertIn("AGENTS.md", files)
+        self.assertNotIn("work.txt", files)
+        status = sh("git", "status", "--porcelain", cwd=self.repo).stdout
+        self.assertIn("A  work.txt", status)      # still staged, not committed
+        self.assertIn("?? notes.txt", status)
+        self.assertNotIn(".agents", status)       # everything kit_ap wrote is committed
+        self.kit("add", "prereg")
+        self.assertEqual(self.log()[0], "Add KIT Adaptive Preregistration module: prereg")
+        self.kit("remove", "prereg")
+        self.assertEqual(self.log()[0], "Remove KIT Adaptive Preregistration module: prereg")
+        self.assertIn(".agents/protocols/PREREG_PROTOCOL.md", self.committed())  # the deletion is committed
+
+    def test_update_commits(self):
+        self.kit("init", "--source", self.src)
+        with open(os.path.join(self.src, "modules/core/instructions.md"), "a") as f:
+            f.write("\n- Another rule.\n")
+        new = self.commit_src("rule")
+        self.vendored("update")
+        self.assertEqual(self.log()[0], f"Update KIT Adaptive Preregistration to {new[:7]}")
+        self.assertEqual(sh("git", "status", "--porcelain", cwd=self.repo).stdout, "")
+
+    def test_no_commit(self):
+        self.kit("init", "--source", self.src, "--no-commit")
+        self.assertEqual(sh("git", "rev-list", "--all", cwd=self.repo).stdout, "")
+        self.assertIn("AGENTS.md", sh("git", "status", "--porcelain", cwd=self.repo).stdout)
+
     def test_convo_log_routes_from_module_config(self):
         self.kit("init", "--source", self.src, "--modules", "experiment-pr-log")
         sh("git", "checkout", "-qb", "experiment/E001", cwd=self.repo)

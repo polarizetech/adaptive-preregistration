@@ -17,9 +17,11 @@ modules/experiment-pr-log/                  .claude/settings.json, .github/hooks
 
 ```bash
 git clone git@github.com:polarizetech/kit-adaptive-preregistration.git ~/Sites/kit-adaptive-preregistration
-~/Sites/kit-adaptive-preregistration/bin/kit_ap init /path/to/project          # core + default modules
-cd /path/to/project && git add .agents AGENTS.md CLAUDE.md .claude .github && git commit -m "Add KIT Adaptive Preregistration"
+cd /path/to/project
+~/Sites/kit-adaptive-preregistration/bin/kit_ap init          # core + default modules, committed
 ```
+
+`init`, `add`, `remove` and `update` commit their own changes, and only the files `kit_ap` wrote or removed. Anything else you have staged or in progress is left alone. Pass `--no-commit` to review the changes before committing them yourself.
 
 From then on the project carries its own copy of the CLI, so you don't need the kit clone:
 

@@ -11,6 +11,7 @@ Installs protocol modules from this kit into a repo as committed, managed files:
 Usage:
   kit_ap list                                    modules in the kit
   kit_ap init [REPO] [--modules a,b] [--source URL|PATH] [--ref REF]
+                                                   (init/add/remove/update commit their changes; --no-commit to skip)
   kit_ap add MODULE... [--repo REPO]
   kit_ap remove MODULE... [--repo REPO]
   kit_ap update [REPO] [--ref REF] [--force]     pull the latest kit and re-apply
@@ -23,6 +24,7 @@ import argparse, glob, hashlib, json, os, re, shutil, subprocess, sys, time
 
 DEFAULT_SOURCE = "https://github.com/polarizetech/kit-adaptive-preregistration.git"
 DEFAULT_REF = "main"
+NAME = "KIT Adaptive Preregistration"
 AGENTS_DIR = ".agents"
 LOCK = os.path.join(AGENTS_DIR, "kit_ap.lock")
 START, END = "<!-- kit_ap:start -->", "<!-- kit_ap:end -->"
@@ -251,7 +253,26 @@ def render_block(mods, order, source):
     return "\n\n".join(parts) + "\n"
 
 
-def apply(kit, repo, wanted, force=False, ref=None):
+def commit_changes(repo, paths, message):
+    """Commit only the paths kit_ap touched; other staged or unstaged work in the repo is left as it was."""
+    paths = sorted(p for p in set(paths) if os.path.lexists(os.path.join(repo, p))
+                   or git("ls-files", "--error-unmatch", "--", p, cwd=repo)[0] == 0)
+    if not paths:
+        return
+    code, _, err = git("add", "-A", "--", *paths, cwd=repo)
+    if code:
+        print(f"kit_ap: couldn't stage the changes ({err}); commit them yourself")
+        return
+    if git("diff", "--cached", "--quiet", "--", *paths, cwd=repo)[0] == 0:
+        return  # nothing changed
+    code, _, err = git("commit", "--quiet", "-m", message, "--", *paths, cwd=repo)
+    if code:
+        print(f"kit_ap: changes are staged but the commit failed:\n  {err}\nFix that, then: git commit -m {json.dumps(message.splitlines()[0])}")
+    else:
+        print(f"kit_ap: committed \"{message.splitlines()[0]}\"")
+
+
+def apply(kit, repo, wanted, force=False, ref=None, message=None):
     mods = load_modules(kit)
     order = resolve(mods, wanted)
     info = kit_info(kit)
@@ -275,13 +296,16 @@ def apply(kit, repo, wanted, force=False, ref=None):
         for event, groups in (read_json(os.path.join(m["dir"], "hooks", "claude.json"), {}).get("hooks") or {}).items():
             claude_hooks.setdefault(event, []).extend(groups)
 
+    touched = [".claude/settings.json", "AGENTS.md", "CLAUDE.md", LOCK]
     for rel in (old.get("files") or {}):
         if rel not in files and os.path.exists(os.path.join(repo, rel)):
             os.remove(os.path.join(repo, rel))
             prune_empty(repo, os.path.dirname(rel))
+            touched.append(rel)
     legacy = os.path.join(repo, ".github", "hooks", "convo-log.json")
     if "tools/convo-log" in read_text(legacy):
         os.remove(legacy)
+        touched.append(os.path.relpath(legacy, repo))
 
     hashes = {}
     for rel, src in sorted(files.items()):
@@ -307,15 +331,19 @@ def apply(kit, repo, wanted, force=False, ref=None):
     for legacy_file in ("tools/convo-log", "CONVERSATIONS.md"):
         if os.path.exists(os.path.join(repo, legacy_file)) and "convo-log" in order:
             print(f"  note: {legacy_file} is from the old install.sh and now lives in .agents/; delete it")
-    print("Review and commit: git add .agents AGENTS.md CLAUDE.md .claude .github")
+    if message:
+        commit_changes(repo, touched + list(hashes), f"{message}\n\nKit: {info['source']} @ {short}")
+    else:
+        print("Review and commit: git add .agents AGENTS.md CLAUDE.md .claude .github")
 
 
-def run_apply(kit, repo, modules, force=False, ref=None):
+def run_apply(kit, repo, modules, force=False, ref=None, message=None):
     """Apply with the kit's own CLI, so a newer kit installs itself with its own logic."""
     if os.path.realpath(kit) == HERE:
-        return apply(kit, repo, modules, force, ref)
+        return apply(kit, repo, modules, force, ref, message)
     cmd = [sys.executable, os.path.join(kit, "bin", "kit_ap"), "_apply", repo, "--kit", kit,
-           "--modules", ",".join(modules)] + (["--force"] if force else []) + (["--ref", ref] if ref else [])
+           "--modules", ",".join(modules)] + (["--force"] if force else []) + (["--ref", ref] if ref else []) \
+        + (["--message", message] if message else [])
     code = subprocess.run(cmd).returncode
     if code:
         sys.exit(code)
@@ -376,13 +404,15 @@ def cmd_init(a):
     kit = fetch(a.source, a.ref or DEFAULT_REF) if a.source else HERE if is_kit(HERE) else fetch(DEFAULT_SOURCE, a.ref or DEFAULT_REF)
     wanted = [m for m in a.modules.split(",") if m] if a.modules is not None else \
         [n for n, m in load_modules(kit).items() if m.get("default")]
-    run_apply(kit, repo, wanted, a.force, a.ref)
+    run_apply(kit, repo, wanted, a.force, a.ref, None if a.no_commit else f"Add {NAME}")
 
 
 def cmd_add(a):
     repo = repo_root(a.repo)
     lock = require_lock(repo)
-    run_apply(installed_kit(lock), repo, lock["modules"] + [m for m in a.modules if m not in lock["modules"]], a.force)
+    new = [m for m in a.modules if m not in lock["modules"]]
+    run_apply(installed_kit(lock), repo, lock["modules"] + new, a.force,
+              message=None if a.no_commit else f"Add {NAME} module: {', '.join(new or a.modules)}")
 
 
 def cmd_remove(a):
@@ -397,7 +427,7 @@ def cmd_remove(a):
         needed = set(mods.get(m, {}).get("requires", [])) & set(a.modules)
         if needed:
             raise Fail(f"{m} requires {', '.join(sorted(needed))}; remove {m} too")
-    run_apply(kit, repo, keep, a.force)
+    run_apply(kit, repo, keep, a.force, message=None if a.no_commit else f"Remove {NAME} module: {', '.join(a.modules)}")
 
 
 def cmd_update(a):
@@ -410,7 +440,7 @@ def cmd_update(a):
         edited = modified_files(repo, lock)
         print("kit_ap: already up to date" + (f"; edited managed files: {', '.join(edited)}" if edited else ""))
         return
-    run_apply(kit, repo, lock["modules"], a.force, ref)
+    run_apply(kit, repo, lock["modules"], a.force, ref, None if a.no_commit else f"Update {NAME} to {new[:7]}")
 
 
 def cmd_check(a):
@@ -453,7 +483,7 @@ def cmd_status(a):
 
 
 def cmd_apply(a):
-    apply(a.kit, repo_root(a.repo), [m for m in a.modules.split(",") if m], a.force, a.ref)
+    apply(a.kit, repo_root(a.repo), [m for m in a.modules.split(",") if m], a.force, a.ref, a.message)
 
 
 def main():
@@ -463,21 +493,22 @@ def main():
     p = sub.add_parser("init", help="install into a repo")
     p.add_argument("repo", nargs="?", default="."); p.add_argument("--modules", help="comma-separated (default: the kit's defaults)")
     p.add_argument("--source", help="kit git URL or path (default: this checkout)"); p.add_argument("--ref")
-    p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_init)
+    p.add_argument("--force", action="store_true"); p.add_argument("--no-commit", action="store_true", help="leave the changes uncommitted"); p.set_defaults(fn=cmd_init)
     for name, fn in (("add", cmd_add), ("remove", cmd_remove)):
         p = sub.add_parser(name, help=f"{name} modules")
         p.add_argument("modules", nargs="+"); p.add_argument("--repo", default=".")
-        p.add_argument("--force", action="store_true"); p.set_defaults(fn=fn)
+        p.add_argument("--force", action="store_true"); p.add_argument("--no-commit", action="store_true", help="leave the changes uncommitted"); p.set_defaults(fn=fn)
     p = sub.add_parser("update", help="pull the latest kit and re-apply")
     p.add_argument("repo", nargs="?", default="."); p.add_argument("--ref"); p.add_argument("--force", action="store_true")
-    p.set_defaults(fn=cmd_update)
+    p.add_argument("--no-commit", action="store_true", help="leave the changes uncommitted"); p.set_defaults(fn=cmd_update)
     for name, fn in (("check", cmd_check), ("status", cmd_status)):
         p = sub.add_parser(name); p.add_argument("repo", nargs="?", default=".")
         p.add_argument("--hook", action="store_true", help="session-start mode: quiet, cached, never fails")
         p.set_defaults(fn=fn)
     p = sub.add_parser("_apply")  # internal: used by update to run the fetched kit's own CLI
     p.add_argument("repo"); p.add_argument("--kit", required=True); p.add_argument("--modules", default="")
-    p.add_argument("--ref"); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_apply)
+    p.add_argument("--ref"); p.add_argument("--force", action="store_true"); p.add_argument("--message")
+    p.set_defaults(fn=cmd_apply)
     a = ap.parse_args()
     try:
         sys.exit(a.fn(a) or 0)
