@@ -16,6 +16,23 @@ def sh(*cmd, cwd=None, check=True, env=None, inp=""):
     return r
 
 
+# Absolute locations the tools also search for gh. A real gh there (as on CI runners) can't be hidden from a test.
+GH_FIXED_LOCATIONS = ("/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/home/linuxbrew/.linuxbrew/bin/gh")
+SYSTEM_GH = any(os.access(p, os.X_OK) for p in GH_FIXED_LOCATIONS)
+
+
+def minimal_path(tmp):
+    """A PATH with only the programs the tools need, so a gh elsewhere on the machine isn't picked up."""
+    d = os.path.join(tmp, "minbin")
+    if not os.path.isdir(d):
+        os.makedirs(d)
+        for tool in ("git", "bash", "env", "cut", "shasum", "sha256sum", "perl", "date", "cat", "tr", "wc", "dirname"):
+            found = shutil.which(tool)
+            if found:
+                os.symlink(found, os.path.join(d, tool))
+    return d
+
+
 def git_init(path):
     os.makedirs(path, exist_ok=True)
     sh("git", "init", "-q", "-b", "main", cwd=path)
@@ -220,7 +237,7 @@ class KitTest(KitBase):
             f.write("#!/usr/bin/env bash\n"
                     f'while [ $# -gt 0 ]; do [ "$1" = "--body" ] && printf "%s" "$2" > "{out}"; shift; done\n')
         os.chmod(os.path.join(stub, "gh"), 0o755)
-        path = (stub + os.pathsep if gh else "") + "/usr/bin:/bin"
+        path = (stub + os.pathsep if gh else "") + minimal_path(self.tmp)
         if os.path.exists(out):
             os.remove(out)
         env = {**self.env, "PATH": path}
@@ -256,9 +273,10 @@ class KitTest(KitBase):
         body, _ = self._receipt("model-v0.1.0")
         self.assertIn("none (not an experiment milestone tag)", body)
         self.assertNotIn(want, body)
-        body, err = self._receipt("E01-stentor-map-prereg", gh=False)
-        self.assertIsNone(body)
-        self.assertIn("gh not found", err)
+        if not SYSTEM_GH:  # a real gh in a fixed location would (correctly) be used
+            body, err = self._receipt("E01-stentor-map-prereg", gh=False)
+            self.assertIsNone(body)
+            self.assertIn("gh not found", err)
 
     def test_convo_log_finds_gh_off_path(self):
         """A hook's PATH often lacks ~/.local/bin; convo-log must still find gh there instead of queueing forever."""
@@ -274,7 +292,7 @@ class KitTest(KitBase):
                     'if [ "$1 $2" = "pr view" ]; then echo \'{"number": 7, "url": "u"}\'; '
                     'else echo "https://x/pull/7#c1"; fi\n')
         os.chmod(os.path.join(stub, "gh"), 0o755)
-        env = {**self.env, "PATH": "/usr/bin:/bin", "HOME": home}
+        env = {**self.env, "PATH": minimal_path(self.tmp), "HOME": home}
         for role, text in (("user", "hi"), ("assistant", "hello")):
             sh(sys.executable, ".agents/tools/convo-log", "add", "--role", role, "--tool", "test", "--no-sync",
                cwd=self.repo, env=env, inp=text)
@@ -286,7 +304,8 @@ class KitTest(KitBase):
         sh(sys.executable, ".agents/tools/convo-log", "add", "--role", "user", "--tool", "test", "--no-sync",
            cwd=self.repo, env=env, inp="again")
         r = sh(sys.executable, ".agents/tools/convo-log", "sync", "--flush", cwd=self.repo, env=env)
-        self.assertIn("gh not found", r.stderr)
+        if not SYSTEM_GH:  # otherwise that gh is found, correctly
+            self.assertIn("gh not found", r.stderr)
 
 
 
