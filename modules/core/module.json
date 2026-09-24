@@ -1,0 +1,7 @@
+{
+  "name": "core",
+  "title": "Core",
+  "description": "How agents treat the kit: where protocols live, precedence, and the session-start update check.",
+  "default": true,
+  "requires": []
+}

@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "type": "command", "command": "python3 .agents/bin/agentkit check --hook", "timeout": 10 }
+    ]
+  }
+}

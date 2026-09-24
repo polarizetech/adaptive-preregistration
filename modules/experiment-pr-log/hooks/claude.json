@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.agents/tools/prereg-status\"", "timeout": 5 } ] }
+    ]
+  }
+}

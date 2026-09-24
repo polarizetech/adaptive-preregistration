@@ -1,0 +1,7 @@
+{
+  "name": "prereg",
+  "title": "Preregistration",
+  "description": "Adaptive preregistration for model experiments: no run before PREREG, deviations logged, failures close the version.",
+  "default": false,
+  "requires": []
+}
