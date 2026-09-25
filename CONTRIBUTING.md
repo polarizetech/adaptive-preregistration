@@ -34,3 +34,7 @@ Tag `vX.Y.Z` on `main`, move the `CHANGELOG.md` entries under that version, and 
 
 Release tags are protected by a repository ruleset: once pushed, a `v*` tag can't be moved or deleted, by
 anyone. A mistake in a release is fixed with a new version, never by re-tagging.
+
+Archiving releases with Zenodo is set up but switched off for now (the webhook was removed after the
+first attempt, for v0.1.1, failed). When it's switched back on, follow
+[`ARCHIVING.md`](modules/prereg/protocols/ARCHIVING.md): add a `.zenodo.json` first, then release a new version.

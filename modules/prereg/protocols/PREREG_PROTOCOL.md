@@ -53,8 +53,8 @@ identical.
 **`EXPERIMENTS.md`** lists every EID, created when its folder is:
 
 ```markdown
-| EID | Question (short) | Replaces | Opened | Status | Verdict |
-|-----|------------------|----------|--------|--------|---------|
+| EID | Question (short) | Replaces | Opened | Status | Verdict | Archive (DOI) |
+|-----|------------------|----------|--------|--------|---------|---------------|
 ```
 
 `Status` is one of {open, prereg, run, closed, abandoned}. An EID abandoned before `-prereg` stays in the table
@@ -93,7 +93,7 @@ Strengthen it in proportion to how much outsiders need to rely on the result:
 - **Protect tags on the host** (GitHub tag protection or rulesets), so pushed milestone tags can't be moved.
 - **Deposit `<EID>-prereg` with an archive**: an OSF registration, a Zenodo release (DOI) or Software
   Heritage (SWHID). Record the identifier in `PREREG.md` §11. This is the only step here that gives an
-  independent, immutable timestamp.
+  independent, immutable timestamp. Step by step: `ARCHIVING.md`.
 - **PR receipts** (`EXPERIMENT_PR_LOG.md`) are evidence that the tagged plan existed by the comment's time.
   They are not an archive (comments can be edited or deleted), and they can't show that nothing ran before
   the plan.
@@ -164,7 +164,8 @@ Every choice the specification leaves to the implementer, listed here and decide
 after seeing output is a deviation.
 
 ## 11. Timestamp / archive
-External identifier (OSF registration, Zenodo DOI, SWHID) or "none: local git history only".
+The archive route (e.g. "Zenodo, from the GitHub release of <EID>-prereg"; its DOI is recorded in
+EXPERIMENTS.md once issued, see ARCHIVING.md), or "none: local git history only".
 ```
 
 ### 3.4 What makes it adaptive

@@ -5,9 +5,19 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## [Unreleased]
+
+- `ARCHIVING.md` (in the `prereg` module): how to deposit a preregistration or release with Zenodo, OSF or
+  Software Heritage, and how to record the identifier. `PREREG.md` §11 now names the archive route; the DOI
+  goes in `EXPERIMENTS.md` once issued. Behaviour in installed projects: yes, a new protocol document after
+  update.
+- Zenodo archiving of this repo is switched off until projects are ready to move there; the v0.1.1 attempt
+  failed and no record was created.
+
 ## [0.1.1] — 2026-09-24
 
-First archived release (Zenodo). No change in behaviour for installed projects.
+No change in behaviour for installed projects. It was meant to be the first release archived on Zenodo;
+the archiving failed and was switched off (see Unreleased).
 
 - `CITATION.cff` carries the author's ORCID.
 - Tests no longer pick up a `gh` installed on the machine (CI runners ship one).
