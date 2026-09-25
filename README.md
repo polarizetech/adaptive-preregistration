@@ -16,7 +16,7 @@ Codex, Copilot, Cursor, Gemini) working there reads the same rules.
 ```bash
 git clone https://github.com/polarizetech/adaptive-preregistration.git
 cd /path/to/your/project
-/path/to/adaptive-preregistration/bin/kit_ap init                 # core, prereg, convo-log
+/path/to/adaptive-preregistration/bin/kit_ap init                 # core, prereg
 /path/to/adaptive-preregistration/bin/kit_ap add experiment-pr-log  # optional: branch/PR per experiment
 ```
 
@@ -26,12 +26,12 @@ After that the project carries its own copy of the CLI, so you don't need the cl
 .agents/bin/kit_ap status               # installed version, modules, up to date?
 .agents/bin/kit_ap update               # pull the latest kit and re-apply
 .agents/bin/kit_ap add experiment-pr-log   # add a module (dependencies come with it)
-.agents/bin/kit_ap remove convo-log      # remove one: its files, hooks and instructions
+.agents/bin/kit_ap remove experiment-pr-log  # remove one: its files, hooks and instructions
 .agents/bin/kit_ap list                 # what modules exist
 ```
 
 Requirements: Python 3.9+ and git, on macOS or Linux (Windows via WSL). No other dependencies. Some modules
-need more (`convo-log` and `experiment-pr-log` need the GitHub CLI, `gh`); `init` prints those notes.
+need more (`experiment-pr-log` needs the GitHub CLI, `gh`); `init` prints those notes.
 
 ## Modules
 
@@ -39,8 +39,7 @@ need more (`convo-log` and `experiment-pr-log` need the GitHub CLI, `gh`); `init
 |---|---|---|
 | `core` | always | Where the protocols live, how conflicts are handled, and a session-start check for updates. |
 | `prereg` | ✓ | The preregistration protocol: `PREREG.md`, `DEVIATIONS.md`, `RESULTS.md`, the experiment registry and milestone tags. [Protocol](modules/prereg/protocols/PREREG_PROTOCOL.md) |
-| `experiment-pr-log` | | One branch and draft PR per experiment, tag receipts posted to the PR, and an optional commit guard that refuses outputs before `-prereg` and edits to a frozen plan. Requires `convo-log`. [Protocol](modules/experiment-pr-log/protocols/EXPERIMENT_PR_LOG.md) |
-| `convo-log` | ✓ | Records each prompt and reply of a coding-assistant session on the branch's PR and in a committed log, with best-effort secret redaction. [Protocol](modules/convo-log/protocols/CONVERSATIONS.md) |
+| `experiment-pr-log` | | One branch and draft PR per experiment, tag receipts posted to the PR, and an optional commit guard that refuses outputs before `-prereg` and edits to a frozen plan. [Protocol](modules/experiment-pr-log/protocols/EXPERIMENT_PR_LOG.md) |
 
 ## What gets installed
 
@@ -54,12 +53,12 @@ this repo (the kit)                           a project that uses it
 modules/core/              ──kit_ap init──▶   AGENTS.md    managed block: always-on rules
 modules/prereg/                               CLAUDE.md    "@AGENTS.md" (Claude Code import)
 modules/experiment-pr-log/ ◀─kit_ap update─   .agents/     protocols/, tools/, bin/kit_ap, kit_ap.lock
-modules/convo-log/                            .claude/settings.json, .github/hooks/   hooks, merged
+                                              .claude/settings.json, .github/hooks/   hooks, merged
 ```
 
 | Tool | Reads the rules from | Hooks |
 |---|---|---|
-| Codex (CLI, IDE, cloud) | `AGENTS.md` | Codex CLI `notify` for convo-log (global; see the note printed at install) |
+| Codex (CLI, IDE, cloud) | `AGENTS.md` | none |
 | GitHub Copilot (VS Code, coding agent) | `AGENTS.md` | `.github/hooks/kit_ap-*.json` (VS Code agent hooks, preview) |
 | Cursor | `AGENTS.md` | none; the rules say what to run by hand |
 | Claude Code | `CLAUDE.md` → `@AGENTS.md` | `.claude/settings.json` |
@@ -95,9 +94,6 @@ source. `update` prints the source and the commit range before it applies, and w
 this repository. Review any change to `.agents/kit_ap.lock` in a pull request the way you would review a
 change to a dependency, and pin a tag (`--ref v0.1.0`) if you want updates to be deliberate.
 
-`convo-log` posts conversation text to pull requests, which are public on public repos. Its secret redaction
-is best-effort pattern matching.
-
 ## Limits
 
 - The protocol protects the *record*, not the idea: a well-preregistered experiment on a wrong model is still
@@ -127,7 +123,7 @@ modules/<name>/
   hooks when it updates or removes them.
 - Tools must never break the session: warn and exit 0 on failure. Stdlib Python 3.9+ or bash only.
 - `notes` are printed once, when a module is first added. `{repo}` expands to the project path.
-- Two modules can't ship the same file. For shared config, use a `.d/` folder (see `config/convo-log.d/`).
+- Two modules can't ship the same file. For config several modules add to, use a `.d/` folder.
 
 ```bash
 python3 -m unittest discover tests      # end-to-end tests against throwaway repos

@@ -18,7 +18,6 @@ After any change in this repo, check whether it alters something the post states
 |---|---|
 | The five rules, What makes it adaptive, What the preregistration contains, Rules for whoever runs it, Limits | `modules/prereg/protocols/PREREG_PROTOCOL.md` |
 | The record (tags, branch and PR per experiment, receipts) | `modules/experiment-pr-log/`: protocol and `tools/` |
-| The record (conversation log) | `modules/convo-log/`: protocol and `tools/convo-log` |
 | How it reaches every project (`kit_ap`, `.agents/`, `AGENTS.md`/`CLAUDE.md`, hooks, commit guard, update check) | `bin/kit_ap`, `modules/*/hooks/`, `modules/core/`, `README.md` |
 
 Update the post if the change alters any of these: a rule, a tag or file name, what a tool or hook does, which tools are supported, a default, or a stated limit. Refactors, tests and wording-only changes to the kit don't need a post change.

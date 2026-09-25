@@ -1,7 +1,7 @@
-# The CLI and tools are single-file scripts without a .py suffix; lint them explicitly.
+# The CLI is a single-file script without a .py suffix; lint it explicitly.
 line-length = 130
 target-version = "py39"
-extend-include = ["bin/kit_ap", "modules/convo-log/tools/convo-log"]
+extend-include = ["bin/kit_ap"]
 
 [lint]
 select = ["E", "F", "W", "B", "UP"]

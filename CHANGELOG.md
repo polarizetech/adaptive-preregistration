@@ -7,6 +7,10 @@ there.
 
 ## [Unreleased]
 
+- **Conversation logging (`convo-log`) is removed from the kit.** Conversations should no longer be recorded to
+  pull requests or committed logs. `experiment-pr-log` no longer depends on it. Projects that have it drop it on
+  their next `update`: its tool, protocol and hooks are deleted and the reason is printed; adding it again is
+  refused. Existing logs and PR comments are not touched. Behaviour in installed projects: yes, on update.
 - The repository is renamed `polarizetech/adaptive-preregistration` (was `kit-adaptive-preregistration`); the
   project is still called KIT Adaptive Preregistration and the CLI is still `kit_ap`. GitHub redirects the old
   URL. `kit_ap` treats the old URL as the default source, and `update` records the new one in the lock.

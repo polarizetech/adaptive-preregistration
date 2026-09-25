@@ -3,7 +3,7 @@
   "title": "Experiment branches and PRs",
   "description": "One branch and draft PR per experiment, tag receipts posted to the PR, commit guard for frozen PREREGs.",
   "default": false,
-  "requires": ["convo-log"],
+  "requires": [],
   "notes": [
     "Turn on the commit guard (replaces .git/hooks for this repo): git config core.hooksPath .agents/githooks"
   ]

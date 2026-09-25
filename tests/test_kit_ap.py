@@ -91,19 +91,18 @@ class KitTest(KitBase):
     def test_init_installs_defaults(self):
         self.kit("init", "--source", self.src)
         lock = self.lock()
-        self.assertEqual(lock["modules"], ["core", "convo-log", "prereg"])
+        self.assertEqual(lock["modules"], ["core", "prereg"])
         self.assertEqual(lock["source"], self.src)
-        for rel in (".agents/bin/kit_ap", ".agents/tools/convo-log", ".agents/protocols/CONVERSATIONS.md",
-                    ".agents/README.md", ".github/hooks/kit_ap-core.json", ".github/hooks/kit_ap-convo-log.json"):
+        for rel in (".agents/bin/kit_ap", ".agents/protocols/PREREG_PROTOCOL.md", ".agents/protocols/ARCHIVING.md",
+                    ".agents/README.md", ".github/hooks/kit_ap-core.json"):
             self.assertTrue(os.path.exists(os.path.join(self.repo, rel)), rel)
-        self.assertTrue(os.access(os.path.join(self.repo, ".agents/tools/convo-log"), os.X_OK))
+        self.assertTrue(os.access(os.path.join(self.repo, ".agents/bin/kit_ap"), os.X_OK))
         agents = self.read("AGENTS.md")
         self.assertIn("<!-- kit_ap:start -->", agents)
-        self.assertIn("## Conversation logging", agents)
+        self.assertIn("## Preregistration", agents)
         self.assertTrue(self.read("CLAUDE.md").startswith("@AGENTS.md"))
         cmds = self.settings_commands()
         self.assertTrue(any("kit_ap\" check --hook" in c for c in cmds))
-        self.assertTrue(any(".agents/tools/convo-log" in c for c in cmds))
 
     def test_keeps_user_content_and_is_idempotent(self):
         os.makedirs(os.path.join(self.repo, ".claude"))
@@ -125,21 +124,25 @@ class KitTest(KitBase):
             self.assertEqual(self.read(p), text, p)
 
     def test_add_pulls_dependencies_and_remove_cleans_up(self):
+        dep = os.path.join(self.src, "modules", "needs-pr-log")  # a module that depends on another
+        os.makedirs(dep)
+        with open(os.path.join(dep, "module.json"), "w") as f:
+            json.dump({"name": "needs-pr-log", "requires": ["experiment-pr-log"]}, f)
+        self.commit_src("add a dependent module")
         self.kit("init", "--source", self.src, "--modules", "")
         self.assertEqual(self.lock()["modules"], ["core"])
-        self.kit("add", "experiment-pr-log")
-        self.assertEqual(self.lock()["modules"], ["core", "convo-log", "experiment-pr-log"])
+        self.kit("add", "needs-pr-log")
+        self.assertEqual(self.lock()["modules"], ["core", "experiment-pr-log", "needs-pr-log"])
         self.assertTrue(os.path.exists(os.path.join(self.repo, ".agents/tools/tag")))
         self.assertTrue(any("prereg-status" in c for c in self.settings_commands()))
-        r = self.kit("remove", "convo-log", check=False)
+        r = self.kit("remove", "experiment-pr-log", check=False)
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("requires convo-log", r.stderr)
-        self.kit("remove", "experiment-pr-log", "convo-log")
+        self.assertIn("requires experiment-pr-log", r.stderr)
+        self.kit("remove", "needs-pr-log", "experiment-pr-log")
         self.assertEqual(self.lock()["modules"], ["core"])
         self.assertFalse(os.path.exists(os.path.join(self.repo, ".agents/tools")))
-        self.assertFalse(os.path.exists(os.path.join(self.repo, ".github/hooks/kit_ap-convo-log.json")))
-        self.assertFalse(any("convo-log" in c or "prereg" in c for c in self.settings_commands()))
-        self.assertNotIn("Conversation logging", self.read("AGENTS.md"))
+        self.assertFalse(any("prereg-status" in c for c in self.settings_commands()))
+        self.assertNotIn("Experiment branches", self.read("AGENTS.md"))
 
     def test_update_from_vendored_cli(self):
         self.kit("init", "--source", self.src)
@@ -159,12 +162,12 @@ class KitTest(KitBase):
 
     def test_edited_managed_file_blocks_update(self):
         self.kit("init", "--source", self.src)
-        with open(os.path.join(self.repo, ".agents/protocols/CONVERSATIONS.md"), "a") as f:
+        with open(os.path.join(self.repo, ".agents/protocols/PREREG_PROTOCOL.md"), "a") as f:
             f.write("local edit\n")
         r = self.vendored("update", "--force", check=False)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertNotIn("local edit", self.read(".agents/protocols/CONVERSATIONS.md"))
-        with open(os.path.join(self.repo, ".agents/protocols/CONVERSATIONS.md"), "a") as f:
+        self.assertNotIn("local edit", self.read(".agents/protocols/PREREG_PROTOCOL.md"))
+        with open(os.path.join(self.repo, ".agents/protocols/PREREG_PROTOCOL.md"), "a") as f:
             f.write("local edit\n")
         r = self.kit("add", "prereg", check=False)
         self.assertNotEqual(r.returncode, 0)
@@ -221,13 +224,6 @@ class KitTest(KitBase):
         self.assertEqual(sh("git", "rev-list", "--all", cwd=self.repo).stdout, "")
         self.assertIn("AGENTS.md", sh("git", "status", "--porcelain", cwd=self.repo).stdout)
 
-    def test_convo_log_routes_from_module_config(self):
-        self.kit("init", "--source", self.src, "--modules", "experiment-pr-log")
-        sh("git", "checkout", "-qb", "experiment/E001", cwd=self.repo)
-        sh(sys.executable, ".agents/tools/convo-log", "add", "--role", "user", "--tool", "test", "--no-sync",
-           cwd=self.repo, env=self.env, inp="hello")
-        self.assertTrue(os.path.exists(os.path.join(self.repo, "experiments/E001/conversation.jsonl")))
-
     def _receipt(self, tag, gh=True):
         """Run prereg-receipt with a stub `gh` that records the comment body; returns (body or None, stderr)."""
         stub = os.path.join(self.tmp, "stubbin")
@@ -277,37 +273,6 @@ class KitTest(KitBase):
             body, err = self._receipt("E01-stentor-map-prereg", gh=False)
             self.assertIsNone(body)
             self.assertIn("gh not found", err)
-
-    def test_convo_log_finds_gh_off_path(self):
-        """A hook's PATH often lacks ~/.local/bin; convo-log must still find gh there instead of queueing forever."""
-        self.kit("init", "--source", self.src, "--modules", "experiment-pr-log")
-        sh("git", "checkout", "-qb", "experiment/E002", cwd=self.repo)
-        home = os.path.join(self.tmp, "home")
-        stub = os.path.join(home, ".local", "bin")
-        os.makedirs(stub)
-        calls = os.path.join(self.tmp, "gh_calls.txt")
-        with open(os.path.join(stub, "gh"), "w") as f:
-            f.write("#!/usr/bin/env bash\n"
-                    f'echo "$@" >> "{calls}"\n'
-                    'if [ "$1 $2" = "pr view" ]; then echo \'{"number": 7, "url": "u"}\'; '
-                    'else echo "https://x/pull/7#c1"; fi\n')
-        os.chmod(os.path.join(stub, "gh"), 0o755)
-        env = {**self.env, "PATH": minimal_path(self.tmp), "HOME": home}
-        for role, text in (("user", "hi"), ("assistant", "hello")):
-            sh(sys.executable, ".agents/tools/convo-log", "add", "--role", role, "--tool", "test", "--no-sync",
-               cwd=self.repo, env=env, inp=text)
-        r = sh(sys.executable, ".agents/tools/convo-log", "sync", cwd=self.repo, env=env)
-        self.assertTrue(os.path.exists(calls), r.stderr)
-        with open(calls) as f:
-            self.assertIn("pr comment 7", f.read())
-        env["HOME"] = os.path.join(self.tmp, "nohome")
-        sh(sys.executable, ".agents/tools/convo-log", "add", "--role", "user", "--tool", "test", "--no-sync",
-           cwd=self.repo, env=env, inp="again")
-        r = sh(sys.executable, ".agents/tools/convo-log", "sync", "--flush", cwd=self.repo, env=env)
-        if not SYSTEM_GH:  # otherwise that gh is found, correctly
-            self.assertIn("gh not found", r.stderr)
-
-
 
 class SafetyTest(KitBase):
     """Failure modes a reviewer found: every one must leave the repo untouched or fail loudly."""
@@ -377,6 +342,35 @@ class SafetyTest(KitBase):
         self.assertEqual((r.returncode, r.stderr), (0, ""))
 
 
+class RetirementTest(KitBase):
+    """A module removed from the kit disappears from projects on their next update, instead of breaking it."""
+
+    def test_retired_module_is_removed_on_update(self):
+        mod = os.path.join(self.src, "modules", "convo-log")  # stands in for the real, removed module
+        for rel, text in (("module.json", '{"name": "convo-log"}'),
+                          ("tools/convo-log", "#!/bin/sh\nexit 0\n"),
+                          ("hooks/claude.json", json.dumps({"hooks": {"Stop": [{"hooks": [
+                              {"type": "command", "command": 'python3 "$CLAUDE_PROJECT_DIR/.agents/tools/convo-log"'}]}]}})),
+                          ("hooks/copilot.json", "{}")):
+            os.makedirs(os.path.dirname(os.path.join(mod, rel)), exist_ok=True)
+            with open(os.path.join(mod, rel), "w") as f:
+                f.write(text)
+        self.commit_src("a kit that still has convo-log")
+        self.kit("init", "--source", self.src, "--modules", "prereg,convo-log")
+        self.assertIn("convo-log", self.lock()["modules"])
+        shutil.rmtree(mod)
+        self.commit_src("retire convo-log")
+        out = self.vendored("update").stdout
+        self.assertIn("[convo-log] removed", out)
+        self.assertEqual(self.lock()["modules"], ["core", "prereg"])
+        self.assertFalse(os.path.exists(os.path.join(self.repo, ".agents/tools/convo-log")))
+        self.assertFalse(os.path.exists(os.path.join(self.repo, ".github/hooks/kit_ap-convo-log.json")))
+        self.assertFalse(any("convo-log" in c for c in self.settings_commands()))
+        r = self.vendored("add", "convo-log", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("removed from the kit", r.stderr)
+
+
 class SourceNameTest(unittest.TestCase):
     """The kit repo was renamed; projects installed under the old URL keep working and move to the new one."""
 
@@ -391,43 +385,6 @@ class SourceNameTest(unittest.TestCase):
         self.assertEqual(cli.canonical_source("/some/local/kit"), "/some/local/kit")
         self.assertNotIn(cli.DEFAULT_SOURCE, cli.FORMER_SOURCES)
 
-
-class RedactionTest(unittest.TestCase):
-    """convo-log posts to PRs that may be public, so credentials must not survive."""
-
-    @classmethod
-    def setUpClass(cls):
-        import importlib.machinery, importlib.util
-        loader = importlib.machinery.SourceFileLoader("convo_log", os.path.join(KIT, "modules/convo-log/tools/convo-log"))
-        spec = importlib.util.spec_from_loader("convo_log", loader)
-        cls.mod = importlib.util.module_from_spec(spec)
-        loader.exec_module(cls.mod)
-
-    SECRETS = {
-        "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY": "wJalrXUtnFEMI",
-        "DATABASE_PASSWORD=hunter2hunter2": "hunter2",
-        "Authorization: Bearer abcdef0123456789abcdef": "abcdef0123456789",
-        "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl": "eyJhbGci",
-        "sk_live_abcdefghijklmnop1234": "abcdefghijklmnop",
-        "AIzaSyA1234567890abcdefghijklmnopqrstuv": "AIzaSy",
-        "postgres://admin:s3cretpw@db.example.com/x": "s3cretpw",
-        'api_key: "a b c d e"': "a b c d e",
-        "ghp_abcdefghijklmnopqrstuvwxyz0123456789": "ghp_",
-        "hf_abcdefghijklmnopqrstuvwxyzABCDEF": "hf_abc",
-        "sk-ant-api03-abcdefghijklmnopqrstuvwx": "api03",
-    }
-
-    def test_secrets_are_redacted(self):
-        for text, secret in self.SECRETS.items():
-            with self.subTest(text=text):
-                out = self.mod.redact(text)
-                self.assertNotIn(secret, out)
-                self.assertIn("[redacted]", out)
-
-    def test_ordinary_prose_is_left_alone(self):
-        for text in ("the token budget is 10", "set a password policy", "secret: tbd", "see https://example.com/a:b@c"):
-            with self.subTest(text=text):
-                self.assertEqual(self.mod.redact(text), text)
 
 
 if __name__ == "__main__":
