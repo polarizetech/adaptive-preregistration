@@ -5,6 +5,14 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## [0.1.1] — 2026-09-24
+
+First archived release (Zenodo). No change in behaviour for installed projects.
+
+- `CITATION.cff` carries the author's ORCID.
+- Tests no longer pick up a `gh` installed on the machine (CI runners ship one).
+- Release tags are protected: a `v*` tag can't be moved or deleted once pushed.
+
 ## [0.1.0] — 2026-09-24
 
 First public release.
