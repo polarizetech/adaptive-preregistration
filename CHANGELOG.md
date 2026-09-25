@@ -7,10 +7,12 @@ there.
 
 ## [Unreleased]
 
-- `ARCHIVING.md` (in the `prereg` module): how to deposit a preregistration or release with Zenodo, OSF or
-  Software Heritage, and how to record the identifier. `PREREG.md` §11 now names the archive route; the DOI
-  goes in `EXPERIMENTS.md` once issued. Behaviour in installed projects: yes, a new protocol document after
-  update.
+- `ARCHIVING.md` (in the `prereg` module): when a preregistration or release qualifies for an OSF
+  Registration, a Zenodo deposit, both or neither, the gates before anything goes public, and the steps for
+  each (OSF Registration; Zenodo from GitHub releases; Zenodo manual deposit; funder repositories). Platform
+  facts checked against OSF's and Zenodo's documentation on 2026-09-25 and cited. `PREREG.md` §11 now names
+  the archive route; the identifier goes in `EXPERIMENTS.md` once issued. Behaviour in installed projects:
+  yes, a new protocol document after update.
 - Zenodo archiving of this repo is switched off until projects are ready to move there; the v0.1.1 attempt
   failed and no record was created.
 

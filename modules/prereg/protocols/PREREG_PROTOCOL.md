@@ -164,8 +164,9 @@ Every choice the specification leaves to the implementer, listed here and decide
 after seeing output is a deviation.
 
 ## 11. Timestamp / archive
-The archive route (e.g. "Zenodo, from the GitHub release of <EID>-prereg"; its DOI is recorded in
-EXPERIMENTS.md once issued, see ARCHIVING.md), or "none: local git history only".
+The archive route, decided with ARCHIVING.md §1: e.g. "OSF Registration, embargoed until <date>" or
+"Zenodo, from the GitHub release of <EID>-prereg". The identifier is recorded in EXPERIMENTS.md once
+issued. Or "none: local git history only".
 ```
 
 ### 3.4 What makes it adaptive

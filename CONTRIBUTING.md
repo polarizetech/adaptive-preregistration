@@ -37,4 +37,4 @@ anyone. A mistake in a release is fixed with a new version, never by re-tagging.
 
 Archiving releases with Zenodo is set up but switched off for now (the webhook was removed after the
 first attempt, for v0.1.1, failed). When it's switched back on, follow
-[`ARCHIVING.md`](modules/prereg/protocols/ARCHIVING.md): add a `.zenodo.json` first, then release a new version.
+[`ARCHIVING.md`](modules/prereg/protocols/ARCHIVING.md) §4a: add a `.zenodo.json` first, then release a new version.
