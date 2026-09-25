@@ -3,7 +3,7 @@
 **Applies to:** anyone deciding whether a preregistration, result or release from this repo goes to an
 external archive, and doing it.
 **Installed by:** the KIT Adaptive Preregistration `prereg` module. `PREREG_PROTOCOL.md` §2 and §11 point here.
-**License:** CC BY 4.0, from [KIT Adaptive Preregistration](https://github.com/polarizetech/kit-adaptive-preregistration). Reuse it with credit.
+**License:** CC BY 4.0, from [KIT Adaptive Preregistration](https://github.com/polarizetech/adaptive-preregistration). Reuse it with credit.
 
 ---
 

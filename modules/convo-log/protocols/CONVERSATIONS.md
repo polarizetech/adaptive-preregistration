@@ -1,6 +1,6 @@
 # Conversation logging
 
-**License:** CC BY 4.0, from [KIT Adaptive Preregistration](https://github.com/polarizetech/kit-adaptive-preregistration). Reuse it with credit.
+**License:** CC BY 4.0, from [KIT Adaptive Preregistration](https://github.com/polarizetech/adaptive-preregistration). Reuse it with credit.
 
 Every LLM conversation on a branch is recorded twice:
 

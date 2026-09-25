@@ -3,7 +3,7 @@
 **Applies to:** everyone who runs experiments in this repo: people, scripts and coding assistants.
 **Status of this file:** binding. If a task conflicts with it, stop and say so before doing the task.
 **Installed by:** the KIT Adaptive Preregistration `prereg` module, which also adds the one-line rule to `AGENTS.md`.
-**License:** CC BY 4.0, from [KIT Adaptive Preregistration](https://github.com/polarizetech/kit-adaptive-preregistration). Reuse it with credit.
+**License:** CC BY 4.0, from [KIT Adaptive Preregistration](https://github.com/polarizetech/adaptive-preregistration). Reuse it with credit.
 
 ---
 

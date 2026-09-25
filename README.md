@@ -14,10 +14,10 @@ Codex, Copilot, Cursor, Gemini) working there reads the same rules.
 ## Quick start
 
 ```bash
-git clone https://github.com/polarizetech/kit-adaptive-preregistration.git
+git clone https://github.com/polarizetech/adaptive-preregistration.git
 cd /path/to/your/project
-/path/to/kit-adaptive-preregistration/bin/kit_ap init                 # core, prereg, convo-log
-/path/to/kit-adaptive-preregistration/bin/kit_ap add experiment-pr-log  # optional: branch/PR per experiment
+/path/to/adaptive-preregistration/bin/kit_ap init                 # core, prereg, convo-log
+/path/to/adaptive-preregistration/bin/kit_ap add experiment-pr-log  # optional: branch/PR per experiment
 ```
 
 After that the project carries its own copy of the CLI, so you don't need the clone:

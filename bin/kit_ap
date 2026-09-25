@@ -14,7 +14,9 @@ Stdlib only (Python 3.9+). Needs git. macOS and Linux (Windows via WSL).
 """
 import argparse, glob, hashlib, json, os, re, shutil, subprocess, sys, time
 
-DEFAULT_SOURCE = "https://github.com/polarizetech/kit-adaptive-preregistration.git"
+DEFAULT_SOURCE = "https://github.com/polarizetech/adaptive-preregistration.git"
+# Earlier names of the default source. GitHub redirects them, and kit_ap records the current name instead.
+FORMER_SOURCES = ("https://github.com/polarizetech/kit-adaptive-preregistration.git",)
 DEFAULT_REF = "main"
 NAME = "KIT Adaptive Preregistration"
 AGENTS_DIR = ".agents"
@@ -144,6 +146,11 @@ def fetch(source, ref=DEFAULT_REF, commit=None):
     return d
 
 
+def canonical_source(source):
+    """The current URL for a source the kit knows under an earlier name (the repo was renamed); else unchanged."""
+    return DEFAULT_SOURCE if source in FORMER_SOURCES else source
+
+
 def kit_info(kit):
     """Where this kit checkout came from and which commit it is at.
 
@@ -153,7 +160,7 @@ def kit_info(kit):
     _, commit, _ = git("rev-parse", "HEAD", cwd=kit)
     _, dirty, _ = git("status", "--porcelain", cwd=kit)
     on_remote = bool(url) and bool(git("branch", "-r", "--contains", "HEAD", cwd=kit)[1])
-    source = url if on_remote and not dirty else os.path.abspath(kit)
+    source = canonical_source(url) if on_remote and not dirty else os.path.abspath(kit)
     return {"source": source, "commit": commit or None, "dirty": bool(dirty)}
 
 
@@ -397,7 +404,7 @@ def installed_kit(lock):
     """The kit version a repo is pinned to, so add/remove never change the version of other modules."""
     if lock.get("dirty") and os.path.isdir(lock["source"]) and is_kit(lock["source"]):
         return lock["source"]  # installed from a local working tree; its commit alone isn't the full picture
-    return fetch(lock["source"], lock.get("ref", DEFAULT_REF), lock.get("commit"))
+    return fetch(canonical_source(lock["source"]), lock.get("ref", DEFAULT_REF), lock.get("commit"))
 
 
 def require_lock(repo):
@@ -412,13 +419,14 @@ def latest_commit(repo, lock, use_cache):
     ref = lock.get("ref", DEFAULT_REF)
     _, gd, _ = git("rev-parse", "--git-common-dir", cwd=repo)
     cache = os.path.join(repo, gd or ".git", "kit_ap-check.json")
-    key = f"{lock['source']}#{ref}"
+    source = canonical_source(lock["source"])
+    key = f"{source}#{ref}"
     c = read_json(cache, {})
     if use_cache and c.get("key") == key:
         age = time.time() - c.get("ts", 0)
         if age < (CHECK_TTL if c.get("sha") else CHECK_FAIL_TTL):
             return c.get("sha")
-    code, out, _ = git("ls-remote", lock["source"], f"refs/heads/{ref}", f"refs/tags/{ref}", f"refs/tags/{ref}^{{}}",
+    code, out, _ = git("ls-remote", source, f"refs/heads/{ref}", f"refs/tags/{ref}", f"refs/tags/{ref}^{{}}",
                        timeout=5)
     refs = dict(reversed(line.split("\t", 1)) for line in out.splitlines() if "\t" in line) if code == 0 else {}
     sha = refs.get(f"refs/heads/{ref}") or refs.get(f"refs/tags/{ref}^{{}}") or refs.get(f"refs/tags/{ref}")
@@ -440,7 +448,7 @@ def cmd_list(a):
     if is_kit(HERE) and not a.source:
         kit = HERE
     else:
-        kit = fetch(a.source or (lock or {}).get("source") or DEFAULT_SOURCE)
+        kit = fetch(a.source or canonical_source((lock or {}).get("source") or DEFAULT_SOURCE))
     have = set((lock or {}).get("modules") or [])
     for name, m in load_modules(kit).items():
         flags = ("installed " if name in have else "") + ("default " if m.get("default") else "")
@@ -493,15 +501,18 @@ def cmd_update(a):
     repo = repo_root(a.repo)
     lock = require_lock(repo)
     ref = a.ref or lock.get("ref", DEFAULT_REF)
-    kit = fetch(lock["source"], ref)
+    source = canonical_source(lock["source"])
+    kit = fetch(source, ref)
     new = kit_info(kit)["commit"]
-    if new == lock.get("commit") and not lock.get("dirty") and not a.force:
+    if new == lock.get("commit") and source == lock["source"] and not lock.get("dirty") and not a.force:
         edited = modified_files(repo, lock)
         print("kit_ap: already up to date" + (f"; edited managed files: {', '.join(edited)}" if edited else ""))
         return
     # The update runs the fetched kit's own code, so say exactly what that is.
-    print(f"kit_ap: updating from {lock['source']} ({ref}): {(lock.get('commit') or '?')[:7]} -> {new[:7]}")
-    if lock["source"] != DEFAULT_SOURCE:
+    print(f"kit_ap: updating from {source} ({ref}): {(lock.get('commit') or '?')[:7]} -> {new[:7]}")
+    if source != lock["source"]:
+        print(f"kit_ap: the kit repo was renamed; recording {source} instead of {lock['source']}")
+    if source != DEFAULT_SOURCE:
         print(f"kit_ap: note: this repo's kit source isn't the default ({DEFAULT_SOURCE}); only continue if you trust it.")
     run_apply(kit, repo, lock["modules"], a.force, ref, None if a.no_commit else f"Update {NAME} to {new[:7]}")
 

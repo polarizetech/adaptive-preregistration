@@ -377,6 +377,21 @@ class SafetyTest(KitBase):
         self.assertEqual((r.returncode, r.stderr), (0, ""))
 
 
+class SourceNameTest(unittest.TestCase):
+    """The kit repo was renamed; projects installed under the old URL keep working and move to the new one."""
+
+    def test_former_name_maps_to_the_current_default(self):
+        import importlib.machinery, importlib.util
+        loader = importlib.machinery.SourceFileLoader("kit_ap_cli", os.path.join(KIT, "bin", "kit_ap"))
+        spec = importlib.util.spec_from_loader("kit_ap_cli", loader)
+        cli = importlib.util.module_from_spec(spec)
+        loader.exec_module(cli)
+        for former in cli.FORMER_SOURCES:
+            self.assertEqual(cli.canonical_source(former), cli.DEFAULT_SOURCE)
+        self.assertEqual(cli.canonical_source("/some/local/kit"), "/some/local/kit")
+        self.assertNotIn(cli.DEFAULT_SOURCE, cli.FORMER_SOURCES)
+
+
 class RedactionTest(unittest.TestCase):
     """convo-log posts to PRs that may be public, so credentials must not survive."""
 

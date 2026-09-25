@@ -5,7 +5,7 @@
 `PREREG_PROTOCOL.md` (experiment IDs, tags). This document only defines *where* the record
 goes and *what* gets posted; it does not define preregistration itself.
 **Installed by:** the KIT Adaptive Preregistration `experiment-pr-log` module, which also adds the one-line rule to `AGENTS.md`.
-**License:** CC BY 4.0, from [KIT Adaptive Preregistration](https://github.com/polarizetech/kit-adaptive-preregistration). Reuse it with credit.
+**License:** CC BY 4.0, from [KIT Adaptive Preregistration](https://github.com/polarizetech/adaptive-preregistration). Reuse it with credit.
 
 ---
 

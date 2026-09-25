@@ -16,7 +16,7 @@ date-released: "2026-09-24"
 license:
   - MIT
   - CC-BY-4.0
-repository-code: "https://github.com/polarizetech/kit-adaptive-preregistration"
+repository-code: "https://github.com/polarizetech/adaptive-preregistration"
 url: "https://polarize.tech/blog/adaptive-preregistration-predict-first-then-run-the-code/"
 keywords:
   - preregistration

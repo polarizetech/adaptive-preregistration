@@ -7,6 +7,10 @@ there.
 
 ## [Unreleased]
 
+- The repository is renamed `polarizetech/adaptive-preregistration` (was `kit-adaptive-preregistration`); the
+  project is still called KIT Adaptive Preregistration and the CLI is still `kit_ap`. GitHub redirects the old
+  URL. `kit_ap` treats the old URL as the default source, and `update` records the new one in the lock.
+  Behaviour in installed projects: their lock's source changes on the next update; nothing else.
 - `ARCHIVING.md` (in the `prereg` module): when a preregistration or release qualifies for an OSF
   Registration, a Zenodo deposit, both or neither, the gates before anything goes public, and the steps for
   each (OSF Registration; Zenodo from GitHub releases; Zenodo manual deposit; funder repositories). Platform
