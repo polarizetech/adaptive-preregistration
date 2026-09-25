@@ -10,6 +10,7 @@ type: software
 authors:
   - family-names: Anderton
     given-names: Joshua
+    orcid: "https://orcid.org/0009-0004-0741-6962"
 version: 0.1.0
 date-released: "2026-09-24"
 license:

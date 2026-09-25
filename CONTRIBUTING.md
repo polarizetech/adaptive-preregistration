@@ -31,3 +31,6 @@ and can say where the protocol doesn't fit practice.
 
 Tag `vX.Y.Z` on `main`, move the `CHANGELOG.md` entries under that version, and update `version` and
 `date-released` in `CITATION.cff`.
+
+Release tags are protected by a repository ruleset: once pushed, a `v*` tag can't be moved or deleted, by
+anyone. A mistake in a release is fixed with a new version, never by re-tagging.
