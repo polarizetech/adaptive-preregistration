@@ -5,7 +5,10 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
-## [Unreleased]
+## [0.2.0] — 2026-09-29
+
+Conversation logging is gone, and archiving with OSF or Zenodo is documented. Run `.agents/bin/kit_ap update`
+in each project to pick it up.
 
 - **Conversation logging (`convo-log`) is removed from the kit.** Conversations should no longer be recorded to
   pull requests or committed logs. `experiment-pr-log` no longer depends on it. Projects that have it drop it on
