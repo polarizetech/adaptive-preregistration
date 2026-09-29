@@ -1,7 +1,7 @@
-# The CLI is a single-file script without a .py suffix; lint it explicitly.
+# The CLI and Python tools are single-file scripts without a .py suffix; lint them explicitly.
 line-length = 130
 target-version = "py39"
-extend-include = ["bin/kit_ap"]
+extend-include = ["bin/kit_ap", "modules/tool-scope/tools/scope-status"]
 
 [lint]
 select = ["E", "F", "W", "B", "UP"]

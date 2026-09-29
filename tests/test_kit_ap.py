@@ -387,5 +387,181 @@ class SourceNameTest(unittest.TestCase):
 
 
 
+class ToolScopeTest(KitBase):
+    """The tool-scope module installs with prereg, and ships its protocol, template and tool."""
+
+    def test_installs_with_prereg(self):
+        self.kit("init", "--source", self.src, "--modules", "tool-scope")
+        self.assertEqual(self.lock()["modules"], ["core", "prereg", "tool-scope"])
+        for rel in (".agents/protocols/SCOPE_PROTOCOL.md", ".agents/templates/SCOPE.toml",
+                    ".agents/tools/scope-status"):
+            self.assertTrue(os.path.exists(os.path.join(self.repo, rel)), rel)
+        self.assertTrue(os.access(os.path.join(self.repo, ".agents/tools/scope-status"), os.X_OK))
+        self.assertIn("## Tool scope", self.read("AGENTS.md"))
+
+
+SCOPE_RECORD = """\
+format = 1
+tool = "v1-demo"
+stage = "exploratory"
+
+[claim]
+text = "The transform the cochlea uses can be run in reverse to turn a recording into audio."
+counts_against = "Listeners can't tell two recordings apart better than chance."
+candidates = ["a", "b"]
+decided = "2026-09-29"
+
+[[features]]
+id = "F1"
+name = "Inverse filterbank"
+kind = "science"
+does = "Inverts the cochlear filterbank"
+counts_against = "Round-trip error above 10 %"
+status = "accepted"
+basis = "derived"
+sources = ["claim:AEP-0003", "doi:10.1000/example [FT]"]
+derivation = "invert each band's filter"
+decision = "use-research"
+decided = "2026-09-29"
+
+[[features]]
+id = "F2"
+name = "Layout"
+kind = "infrastructure"
+does = "A two-column grid"
+status = "accepted"
+
+[[features]]
+id = "F3"
+name = "Band count"
+kind = "science"
+does = "Uses 24 bands"
+counts_against = "Fewer bands lose the distinction"
+status = "accepted"
+basis = "override"
+departs_from = "32 bands is the usual choice"
+reasoning = "Fewer bands are \\"easier\\" to hear.\\nSecond line."
+decision = "override"
+decided = "2026-09-29"
+experiments = ["projects/demo/experiments/E01-bands"]
+
+[[features]]
+id = "F4"
+name = "Onset threshold"
+kind = "science"
+does = "Marks an onset above a threshold"
+counts_against = "Onsets don't match the recording's events"
+status = "accepted"
+basis = "gap"
+decision = "research-further"
+decided = "2026-09-29"
+
+[[features]]
+id = "F5"
+name = "Dropped idea"
+kind = "science"
+status = "dropped"
+
+[[revisions]]
+feature = "F3"
+date = "2026-09-29"
+from = "use-research"
+to = "override"
+outcome_known = "no"
+reasoning = "Changed my mind."
+"""
+
+
+class ScopeStatusTest(unittest.TestCase):
+    """scope-status implements the record contract in SCOPE_PROTOCOL.md section 9."""
+
+    TOOL = os.path.join(KIT, "modules", "tool-scope", "tools", "scope-status")
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def status(self, record, *args, name="SCOPE.toml"):
+        path = os.path.join(self.tmp, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write(record)
+        return sh(sys.executable, self.TOOL, *args, path, check=False)
+
+    def test_valid_exploratory_record(self):
+        r = self.status(SCOPE_RECORD, "--check")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertNotIn("Errors", r.stdout)
+        self.assertIn("Blocked", r.stdout)
+        self.assertIn("F4: research further", r.stdout)
+        self.assertIn("F3: override's experiment has no recorded result", r.stdout)
+        self.assertIn("The transform the cochlea uses", r.stdout)  # the claim, verbatim
+
+    def test_production_needs_everything_resolved(self):
+        production = SCOPE_RECORD.replace('stage = "exploratory"', 'stage = "production"')
+        r = self.status(production, "--check")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("Before production", r.stdout)
+        ready = production.split('[[features]]\nid = "F4"')[0].replace(
+            'experiments = ["projects/demo/experiments/E01-bands"]',
+            'experiments = ["projects/demo/experiments/E01-bands"]\nresult = "RESULTS.md: PASS; kept"')
+        ready += SCOPE_RECORD[SCOPE_RECORD.index('[[features]]\nid = "F5"'):]
+        r = self.status(ready, "--check")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("Nothing open", r.stdout)
+
+    def test_without_check_always_exits_zero(self):
+        r = self.status(SCOPE_RECORD.replace('stage = "exploratory"', 'stage = "production"'))
+        self.assertEqual(r.returncode, 0)
+
+    def test_contract_errors(self):
+        cases = {
+            "established needs at least one source": SCOPE_RECORD.replace(
+                'basis = "derived"\nsources = ["claim:AEP-0003", "doi:10.1000/example [FT]"]',
+                'basis = "established"\nsources = []'),
+            "needs an identifier": SCOPE_RECORD.replace('"doi:10.1000/example [FT]"', '"doi:10.1000/example"'),
+            "override needs `reasoning`": SCOPE_RECORD.replace(
+                'reasoning = "Fewer bands are \\"easier\\" to hear.\\nSecond line."\n', ""),
+            "a gap can only be open": SCOPE_RECORD.replace(
+                'basis = "gap"\ndecision = "research-further"', 'basis = "gap"\ndecision = "use-research"'),
+            "duplicate id": SCOPE_RECORD.replace('id = "F2"', 'id = "F1"'),
+            "decided must be YYYY-MM-DD": SCOPE_RECORD.replace('decided = "2026-09-29"\n\n[[features]]\nid = "F2"',
+                                                             'decided = "29/09/2026"\n\n[[features]]\nid = "F2"'),
+            "isn't in the record": SCOPE_RECORD.replace('feature = "F3"', 'feature = "F9"'),
+            "kind must be one of": SCOPE_RECORD.replace('kind = "infrastructure"', 'kind = "ui"'),
+        }
+        for message, record in cases.items():
+            with self.subTest(message):
+                self.assertNotEqual(record, SCOPE_RECORD, "fixture replacement didn't apply")
+                r = self.status(record, "--check")
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertIn(message, r.stdout)
+
+    def test_missing_basis_is_open_not_an_error(self):
+        record = SCOPE_RECORD.replace('basis = "derived"\n', "").replace('decision = "use-research"\n', "")
+        r = self.status(record, "--check")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("F1: no basis yet", r.stdout)
+
+    def test_outside_the_toml_subset_is_rejected(self):
+        for bad in ('reasoning = """two\nlines"""', 'meta = { a = 1 }', 'decided = 2026-09-29'):
+            with self.subTest(bad):
+                r = self.status(SCOPE_RECORD + "\n[extra]\n" + bad + "\n", "--check")
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertIn("cannot read the record", r.stdout)
+
+    def test_finds_every_record_under_a_folder(self):
+        for app in ("apps/v1-one", "apps/v2-two", ".agents/templates"):
+            os.makedirs(os.path.join(self.tmp, app))
+            with open(os.path.join(self.tmp, app, "SCOPE.toml"), "w") as f:
+                f.write(SCOPE_RECORD.replace('tool = "v1-demo"', f'tool = "{os.path.basename(app)}"'))
+        r = sh(sys.executable, self.TOOL, self.tmp, check=False)
+        self.assertIn("v1-one", r.stdout)
+        self.assertIn("v2-two", r.stdout)
+        self.assertNotIn("templates", r.stdout)  # the vendored template is skipped
+
+
 if __name__ == "__main__":
     unittest.main()

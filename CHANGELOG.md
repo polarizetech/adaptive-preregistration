@@ -5,6 +5,18 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## [Unreleased]
+
+- **New module: `tool-scope`** (opt-in; requires `prereg`). Before an assistant builds software that
+  explores a research claim, it scopes the tool with the user step by step: the claim first, recorded in the
+  user's words with what would count against it; then features; then, for every scientific feature, an
+  evidence basis (`established`, `supported`, `derived`, `override`, `gap`) and the user's decision, one at a
+  time. The basis extends `PREREG_PROTOCOL.md`'s parameter tags to features, and every override is drafted as a
+  prediction for a preregistered experiment. Each tool keeps a `SCOPE.toml` record whose format is a
+  documented contract (`SCOPE_PROTOCOL.md` §9) that other tools can validate without dependencies;
+  `.agents/tools/scope-status` prints its state and, with `--check`, gates CI. Behaviour in installed
+  projects: none unless the module is added.
+
 ## [0.2.0] — 2026-09-29
 
 Conversation logging is gone, and archiving with OSF or Zenodo is documented. Run `.agents/bin/kit_ap update`

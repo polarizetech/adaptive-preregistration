@@ -1,0 +1,10 @@
+{
+  "name": "tool-scope",
+  "title": "Tool scope",
+  "description": "Scope a research tool with the user before building it: the claim first, then features, then an evidence basis and a recorded decision for every scientific feature.",
+  "default": false,
+  "requires": ["prereg"],
+  "notes": [
+    "Start a tool's record by copying .agents/templates/SCOPE.toml next to the tool's code; .agents/tools/scope-status shows what is open."
+  ]
+}
