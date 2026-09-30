@@ -5,7 +5,9 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
-## [Unreleased]
+## [0.3.0] — 2026-09-29
+
+Adds the `tool-scope` module. Nothing changes in a project until it runs `.agents/bin/kit_ap add tool-scope`.
 
 - **New module: `tool-scope`** (opt-in; requires `prereg`). Before an assistant builds software that
   explores a research claim, it scopes the tool with the user step by step: the claim first, recorded in the
