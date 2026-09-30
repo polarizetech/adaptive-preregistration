@@ -5,7 +5,7 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
-## [Unreleased]
+## [0.5.0] — 2026-09-30
 
 **Behaviour in installed projects:** `tool-scope` now also applies automatically to a repository that is
 itself a tool. Projects with the module get it on `.agents/bin/kit_ap update`.
