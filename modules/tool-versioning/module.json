@@ -1,0 +1,10 @@
+{
+  "name": "tool-versioning",
+  "title": "Tool versioning",
+  "description": "For tool repos (libraries, instruments, bridges) whose output other people's research consumes: one version, output-changing releases named in the changelog, consumers listed, and release-check. Installs alongside prereg.",
+  "default": false,
+  "requires": [],
+  "notes": [
+    "For a repo that is a tool: it holds no experiments. Before tagging a release, and in CI, run: python3 .agents/tools/release-check"
+  ]
+}

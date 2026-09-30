@@ -545,6 +545,108 @@ reasoning = "Changed my mind."
 """
 
 
+class ToolVersioningTest(KitBase):
+    """The tool-versioning module: installs on request, alongside prereg, and its release-check tool."""
+
+    RELEASE_CHECK = os.path.join(KIT, "modules", "tool-versioning", "tools", "release-check")
+
+    def test_installs_its_protocol_tool_and_rules(self):
+        self.kit("init", "--source", self.src, "--modules", "tool-versioning")
+        self.assertIn("tool-versioning", self.lock()["modules"])
+        self.assertIn(".agents/protocols/TOOL_VERSIONING.md", self.lock()["files"])
+        self.assertIn(".agents/tools/release-check", self.lock()["files"])
+        self.assertTrue(os.access(os.path.join(self.repo, ".agents/tools/release-check"), os.X_OK))
+        agents = self.read("AGENTS.md")
+        self.assertIn("## Tool versioning", agents)
+        self.assertIn(".agents/protocols/TOOL_VERSIONING.md", agents)
+
+    def test_not_a_default(self):
+        self.kit("init", "--source", self.src)
+        self.assertNotIn("tool-versioning", self.lock()["modules"])
+
+    def test_installs_alongside_prereg(self):
+        self.kit("init", "--source", self.src, "--modules", "prereg,tool-versioning")
+        self.assertEqual(self.lock()["modules"], ["core", "prereg", "tool-versioning"])
+        self.assertIn(".agents/protocols/SCOPE_PROTOCOL.md", self.lock()["files"])  # prereg carries scoping
+        self.assertIn("## Tool versioning", self.read("AGENTS.md"))
+
+    # ---- release-check
+
+    def write(self, rel, text):
+        path = os.path.join(self.repo, rel)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w") as f:
+            f.write(text)
+
+    def release_check(self):
+        return sh(sys.executable, self.RELEASE_CHECK, cwd=self.repo, check=False)
+
+    def tool_repo(self, version="0.2.0", cff=None, heading=None):
+        self.write("pyproject.toml", f'[build-system]\nrequires = ["setuptools"]\n\n[project]\nname = "t"\n'
+                                     f'version = "{version}"\n\n[tool.x]\nversion = "9.9.9"\n')
+        self.write("CITATION.cff", f"cff-version: 1.2.0\nversion: {cff or version}\n")
+        self.write("CHANGELOG.md", "# Changelog\n\n## [Unreleased]\n\n"
+                   + (heading or f"## [{version}] — 2026-09-20") + "\n\n- first\n\n## [0.1.0] — 2026-09-01\n\n- old\n")
+        sh("git", "add", "-A", cwd=self.repo)
+        sh("git", "commit", "-qm", "release", cwd=self.repo)
+
+    def test_passes_on_a_tagged_release(self):
+        self.tool_repo()
+        sh("git", "tag", "-a", "v0.2.0", "-m", "2026-09-20 first minor", cwd=self.repo)
+        r = self.release_check()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("released as v0.2.0", r.stdout)
+
+    def test_an_unreleased_version_needs_no_tag(self):
+        self.tool_repo(heading="## [0.2.0]")
+        r = self.release_check()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("not released yet", r.stdout)
+
+    def test_failures(self):
+        self.tool_repo(cff="0.1.9")
+        r = self.release_check()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("CITATION.cff version 0.1.9 != 0.2.0", r.stdout)
+        self.assertIn("tag v0.2.0 doesn't exist", r.stdout)
+        sh("git", "tag", "v0.2.0", cwd=self.repo)  # lightweight
+        self.assertIn("lightweight", self.release_check().stdout)
+        for research in ("experiments/E01/PREREG.md", "preregistrations/E01/PREREG.md"):
+            self.write(research, "x\n")
+            self.assertIn(f"{research.split('/')[0]} exists", self.release_check().stdout)
+
+    def test_a_patch_may_not_change_outputs(self):
+        self.tool_repo(version="0.2.1", heading="## [0.2.1]\n\n### Outputs changed\n- `rate` now measured")
+        r = self.release_check()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("PATCH release", r.stdout)
+
+    def test_dunder_version_and_a_missing_heading(self):
+        self.write("pkg/__init__.py", '__version__ = "0.3.0"\n')
+        self.write("CITATION.cff", "version: 0.3.0\n")
+        self.write("CHANGELOG.md", "## [0.2.0] — 2026-09-20\n")
+        sh("git", "add", "-A", cwd=self.repo)
+        r = self.release_check()
+        self.assertIn("__version__ in pkg/__init__.py", r.stdout)
+        self.assertIn("no heading for 0.3.0", r.stdout)
+        self.write("pkg/other.py", '__version__ = "0.3.1"\n')
+        sh("git", "add", "-A", cwd=self.repo)
+        self.assertIn("disagrees", self.release_check().stdout)
+
+    def test_tool_toml_is_a_source_and_a_mirror(self):
+        self.write("TOOL.toml", 'kind = "tool"\nname = "t"\nversion = "0.4.0"\n\n[[consumers]]\nversion = "9"\n')
+        self.write("CITATION.cff", "version: 0.4.0\n")
+        self.write("CHANGELOG.md", "## [0.4.0]\n")
+        sh("git", "add", "-A", cwd=self.repo)
+        r = self.release_check()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("version 0.4.0 (TOOL.toml version)", r.stdout)
+        self.tool_repo(version="0.5.0", heading="## [0.5.0]")  # pyproject is now the source
+        r = self.release_check()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("TOOL.toml version 0.4.0 != 0.5.0", r.stdout)
+
+
 class ScopeStatusTest(unittest.TestCase):
     """scope-status implements the record contract in SCOPE_PROTOCOL.md section 9."""
 
@@ -584,6 +686,19 @@ class ScopeStatusTest(unittest.TestCase):
         r = self.status(ready, "--check")
         self.assertEqual(r.returncode, 0, r.stdout)
         self.assertIn("Nothing open", r.stdout)
+
+    def test_a_tool_repository_links_its_overrides_into_the_corpus(self):
+        """A tool holds no research: its override's experiment lives in the corpus (SCOPE_PROTOCOL.md §1, §7)."""
+        with open(os.path.join(self.tmp, "TOOL.toml"), "w") as f:
+            f.write('kind = "tool"\nname = "demo"\n')
+        ready = SCOPE_RECORD.replace('stage = "exploratory"', 'stage = "production"')
+        ready = ready.split('[[features]]\nid = "F4"')[0].replace(
+            'experiments = ["projects/demo/experiments/E01-bands"]',
+            'experiments = ["corpus:demo/preregistrations/E01-bands"]\nresult = "corpus RESULTS.md: PASS; kept"')
+        ready += SCOPE_RECORD[SCOPE_RECORD.index('[[features]]\nid = "F5"'):]
+        r = self.status(ready, "--check")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertNotIn("preregistrations", os.listdir(self.tmp))
 
     def test_without_check_always_exits_zero(self):
         r = self.status(SCOPE_RECORD.replace('stage = "exploratory"', 'stage = "production"'))

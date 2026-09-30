@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+"""release-check — the mechanical checks of TOOL_VERSIONING.md for a tool repo.
+
+  - the version source (pyproject.toml [project] version, else one __version__ in tracked *.py, else
+    TOOL.toml's version) is SemVer and equals CITATION.cff's version, and TOOL.toml's if there is one;
+  - CHANGELOG.md has a heading for that version;
+  - if the heading is dated (released), the annotated tag v<version> exists and its message has an ISO date;
+  - a PATCH release (X.Y.Z with Z > 0) has no "### Outputs changed" section;
+  - there is no EXPERIMENTS.md, experiments/ or preregistrations/ at the repo root.
+
+usage: .agents/tools/release-check [--repo PATH]
+Exits 1 if any check fails, 0 otherwise. Not a hook: run it before tagging a release, and in CI.
+Stdlib only (Python 3.9+).
+"""
+import argparse, os, re, subprocess, sys
+
+SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
+ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+VERSION_ASSIGN = re.compile(r"""^version\s*=\s*["']([^"']+)["']""", re.M)
+DUNDER = re.compile(r"""^__version__\s*(?::\s*str\s*)?=\s*["']([^"']+)["']""", re.M)
+
+
+def git(repo, *args):
+    r = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True)
+    return r.returncode, r.stdout.strip()
+
+
+def read(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def toml_section(text, name):
+    """The body of a [name] table in a TOML file (enough for a version string; no TOML parser on 3.9)."""
+    m = re.search(r"^\[" + re.escape(name) + r"\]\s*$(.*?)(?=^\[|\Z)", text, re.M | re.S)
+    return m.group(1) if m else None
+
+
+def version_source(repo):
+    """(version, where) or (None, reason)."""
+    py = read(os.path.join(repo, "pyproject.toml"))
+    if py is not None:
+        project = toml_section(py, "project")
+        m = VERSION_ASSIGN.search(project or "")
+        if m:
+            return m.group(1), "pyproject.toml [project] version"
+    _, out = git(repo, "ls-files", "-z", "--", "*.py")
+    found = {}
+    for rel in filter(None, out.split("\0")):
+        text = read(os.path.join(repo, rel)) or ""
+        for v in DUNDER.findall(text):
+            found.setdefault(v, []).append(rel)
+    if len(found) == 1:
+        (v, files), = found.items()
+        return v, f"__version__ in {', '.join(files)}"
+    if len(found) > 1:
+        return None, "__version__ disagrees between files: " + "; ".join(f"{v} in {', '.join(f)}" for v, f in found.items())
+    tool = tool_toml_version(repo)
+    if tool:
+        return tool, "TOOL.toml version"
+    return None, ("no version source: add `version` to pyproject.toml [project], one `__version__ = \"X.Y.Z\"`, "
+                  "or `version` in TOOL.toml")
+
+
+def tool_toml_version(repo):
+    """TOOL.toml's top-level `version`, or None (the lines before the first table)."""
+    text = read(os.path.join(repo, "TOOL.toml"))
+    if text is None:
+        return None
+    m = VERSION_ASSIGN.search(re.split(r"^\[", text, maxsplit=1, flags=re.M)[0])
+    return m.group(1) if m else None
+
+
+def cff_version(repo):
+    text = read(os.path.join(repo, "CITATION.cff"))
+    if text is None:
+        return None
+    m = re.search(r"""^version:\s*["']?([^"'\s#]+)""", text, re.M)
+    return m.group(1) if m else ""
+
+
+def changelog_entry(text, version):
+    """(heading line, body) of the CHANGELOG entry for `version`, or (None, None)."""
+    pat = re.compile(r"^##\s+\[?v?" + re.escape(version) + r"\]?(?=[\s\]]|$).*$", re.M)
+    m = pat.search(text)
+    if not m:
+        return None, None
+    nxt = re.search(r"^##\s", text[m.end():], re.M)
+    return m.group(0), text[m.end():m.end() + nxt.start()] if nxt else text[m.end():]
+
+
+def check(repo):
+    fails, notes = [], []
+    version, where = version_source(repo)
+    if version is None:
+        fails.append(where)
+    else:
+        notes.append(f"version {version} ({where})")
+        if not SEMVER.match(version):
+            fails.append(f"version {version} is not SemVer X.Y.Z")
+
+    cff = cff_version(repo)
+    if cff is None:
+        fails.append("no CITATION.cff")
+    elif not cff:
+        fails.append("CITATION.cff has no version")
+    elif version and cff != version:
+        fails.append(f"CITATION.cff version {cff} != {version} ({where})")
+    tool = tool_toml_version(repo)
+    if version and tool and tool != version:
+        fails.append(f"TOOL.toml version {tool} != {version} ({where})")
+
+    changelog = read(os.path.join(repo, "CHANGELOG.md"))
+    if version:
+        if changelog is None:
+            fails.append("no CHANGELOG.md")
+        else:
+            heading, body = changelog_entry(changelog, version)
+            if heading is None:
+                fails.append(f"CHANGELOG.md has no heading for {version}")
+            else:
+                m = SEMVER.match(version)
+                if m and int(m.group(3)) > 0 and re.search(r"^###\s+Outputs changed\b", body, re.M):
+                    fails.append(f"{version} is a PATCH release but its CHANGELOG entry has '### Outputs changed'; "
+                                 "output changes need a new MINOR")
+                if ISO_DATE.search(heading):
+                    tag = f"v{version}"
+                    code, kind = git(repo, "cat-file", "-t", f"refs/tags/{tag}")
+                    if code:
+                        fails.append(f"CHANGELOG dates {version} as released, but tag {tag} doesn't exist")
+                    elif kind != "tag":
+                        fails.append(f"tag {tag} is lightweight; release tags are annotated (git tag -a)")
+                    else:
+                        _, msg = git(repo, "tag", "-l", "--format=%(contents)", tag)
+                        if not ISO_DATE.search(msg):
+                            fails.append(f"tag {tag}'s message has no ISO date (YYYY-MM-DD)")
+                        else:
+                            notes.append(f"released as {tag}")
+                else:
+                    notes.append(f"{version} not released yet (its CHANGELOG heading has no date)")
+
+    for rel in ("EXPERIMENTS.md", "experiments", "preregistrations"):
+        if os.path.lexists(os.path.join(repo, rel)):
+            fails.append(f"{rel} exists; a tool holds no experiments (they belong in a research repo)")
+    return fails, notes
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="release-check", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--repo", default=".", help="the tool repo (default: current directory)")
+    a = ap.parse_args()
+    code, repo = git(a.repo, "rev-parse", "--show-toplevel")
+    if code:
+        print(f"release-check: not a git repo: {os.path.abspath(a.repo)}", file=sys.stderr)
+        return 1
+    fails, notes = check(repo)
+    for n in notes:
+        print(f"release-check: {n}")
+    for f in fails:
+        print(f"release-check: FAIL {f}")
+    if not fails:
+        print("release-check: ok")
+    return 1 if fails else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

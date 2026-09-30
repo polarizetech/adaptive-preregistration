@@ -11,8 +11,8 @@ authors:
   - family-names: Anderton
     given-names: Joshua
     orcid: "https://orcid.org/0009-0004-0741-6962"
-version: 0.6.0
-date-released: "2026-09-30"
+version: 0.7.0
+date-released: "2026-10-01"
 license:
   - MIT
   - CC-BY-4.0

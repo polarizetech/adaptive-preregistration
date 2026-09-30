@@ -5,6 +5,25 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## [0.7.0] — 2026-10-01
+
+A new module for releasing tools, and tool repositories keep their research elsewhere.
+
+- **New module `tool-versioning`** (not a default), for a repo that is a tool whose output other people's
+  research consumes. `TOOL_VERSIONING.md` sets eight rules: a tool holds only the tool; one SemVer version
+  source (`pyproject.toml`, a single `__version__`, or `TOOL.toml`) mirrored in `CITATION.cff` and `TOOL.toml`,
+  released as annotated `vX.Y.Z` tags never moved; a release that changes an output bumps MINOR and lists it
+  under `### Outputs changed`, naming the consumers to re-run; consumers pin tags and are listed with what they
+  use; one-way dependencies enforced by a test; separately versioned extensions with tested ranges; siloed
+  experimental features; claims about the tool preregistered in a research repo against a pinned tag.
+  `.agents/tools/release-check` checks the mechanical parts. It installs alongside `prereg`. Built from a
+  draft in an earlier session. Behaviour in installed projects: none unless the module is added.
+- **A tool repository's overrides are preregistered in the research corpus,** not in the tool. A repository
+  that is a tool (`TOOL.toml` with `kind = "tool"`, or `**Kind:** tool`) holds no research: an override in its
+  `SCOPE.toml` links to an experiment preregistered in the corpus project (`corpus_project`), and findings stay
+  there. Units inside a study are unchanged. Behaviour in installed projects: yes, after update, for tool
+  repositories only.
+
 ## [0.6.0] — 2026-09-30
 
 Preregistration works per unit, and every unit starts with a falsifiable claim. `tool-scope` is merged into `prereg`.
