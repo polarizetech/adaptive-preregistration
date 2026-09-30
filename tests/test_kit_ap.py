@@ -581,10 +581,22 @@ class ScopeStatusTest(unittest.TestCase):
         r = self.make_repo(manifest='kind = "study"\nname = "demo"\n', tools=(("sonifier", False),))
         self.assertIn("tools/sonifier: no SCOPE.toml yet", r.stdout)
 
-    def test_tools_folder_outside_a_study_is_not_flagged(self):
+    def test_tool_repository_is_scoped_at_its_root(self):
         r = self.make_repo("**Kind:** tool · **Stage:** SKETCH", tools=(("scripts", False),))
+        self.assertEqual(r.returncode, 0, r.stdout)  # unscoped is open, not a contract error
+        self.assertIn("this tool repository (its root): no SCOPE.toml yet", r.stdout)
+        self.assertNotIn("tools/scripts", r.stdout)  # a tool's own tools/ folder isn't a set of tools
+
+    def test_tool_repository_by_manifest_with_a_record(self):
+        with open(os.path.join(self.tmp, "TOOL.toml"), "w") as f:
+            f.write('kind = "tool"\nname = "demo"\n')
+        r = self.make_repo()
+        self.assertIn("this tool repository (its root): no SCOPE.toml yet", r.stdout)
+        with open(os.path.join(self.tmp, "SCOPE.toml"), "w") as f:
+            f.write(SCOPE_RECORD)
+        r = sh(sys.executable, self.TOOL, "--check", self.tmp, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout)
         self.assertNotIn("Unscoped", r.stdout)
-        self.assertEqual(r.returncode, 0)
 
     def test_nothing_to_check_passes(self):
         r = sh(sys.executable, self.TOOL, "--check", self.tmp, check=False)

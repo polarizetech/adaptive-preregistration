@@ -4,7 +4,8 @@
 
 Usage:
   scope-status [PATH]           PATH is a SCOPE.toml, or a folder searched for them (default: .)
-                                In a study's root, it also lists the folders under tools/ with no record yet.
+                                In a tool repository's root with no record, it says so; in a study's root,
+                                it lists the folders under tools/ with no record yet.
   scope-status --check [PATH]   exit 1 if a record breaks the contract, or a production record isn't ready
 
 Prints the claim, each feature's basis and decision, and three lists: open decisions, blocked features,
@@ -320,24 +321,30 @@ def report(path, rec, errors, open_items, blocked, before_production):
     return "\n".join(out)
 
 
-def is_study(root):
-    """A study, as SCOPE_PROTOCOL.md §1 defines it: STUDY.toml says kind = "study", or the README's kind line does."""
-    manifest = os.path.join(root, "STUDY.toml")
+def is_kind(root, kind):
+    """SCOPE_PROTOCOL.md §1: the manifest (STUDY.toml or TOOL.toml) says kind = "<kind>", or the README's kind line does."""
     try:
-        with open(manifest, encoding="utf-8") as fh:
-            if re.search(r'^\s*kind\s*=\s*"study"\s*(#.*)?$', fh.read(), re.M):
+        with open(os.path.join(root, f"{kind.upper()}.toml"), encoding="utf-8") as fh:
+            if re.search(rf'^\s*kind\s*=\s*"{kind}"\s*(#.*)?$', fh.read(), re.M):
                 return True
     except OSError:
         pass
     try:
         with open(os.path.join(root, "README.md"), encoding="utf-8") as fh:
-            return bool(re.search(r"\*\*Kind:\*\*\s*study\b", fh.read(), re.I))
+            return bool(re.search(rf"\*\*Kind:\*\*\s*{kind}\b", fh.read(), re.I))
     except OSError:
         return False
 
 
+def is_study(root):
+    return is_kind(root, "study")
+
+
 def unscoped_tools(root):
-    """In a study, the folders directly under tools/ that have no SCOPE.toml (scoping applies to them automatically)."""
+    """Tools that scoping applies to automatically but that have no SCOPE.toml: a tool repository's root, and in a
+    study, the folders directly under tools/."""
+    if os.path.isdir(root) and is_kind(root, "tool") and not os.path.exists(os.path.join(root, "SCOPE.toml")):
+        return ["this tool repository (its root)"]
     tools = os.path.join(root, "tools")
     if not (os.path.isdir(root) and is_study(root) and os.path.isdir(tools)):
         return []
@@ -367,7 +374,7 @@ def main():
     paths = find_records(a.path)
     unscoped = unscoped_tools(a.path)
     if unscoped:
-        print("Unscoped tools (in a study, every folder under tools/ is scoped; SCOPE_PROTOCOL.md §1):")
+        print("Unscoped tools (a tool repository, and every folder under a study's tools/, is scoped; SCOPE_PROTOCOL.md §1):")
         print("\n".join(f"  - {d}: no SCOPE.toml yet" for d in unscoped))
     if not paths:
         if not unscoped:

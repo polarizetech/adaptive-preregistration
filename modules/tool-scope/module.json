@@ -1,12 +1,12 @@
 {
   "name": "tool-scope",
   "title": "Tool scope",
-  "description": "Scope research tools with the user before building them: automatically for every folder under a study's tools/, on request elsewhere. The claim first, then features, then an evidence basis and a recorded decision for every scientific feature.",
+  "description": "Scope research tools with the user before building them: automatically in a tool repository (TOOL.toml) and for every folder under a study's tools/, on request elsewhere. The claim first, then features, then an evidence basis and a recorded decision for every scientific feature.",
   "default": false,
   "requires": [
     "prereg"
   ],
   "notes": [
-    "In a study, every folder under tools/ is scoped automatically, with its record at tools/<name>/SCOPE.toml (template: .agents/templates/SCOPE.toml). .agents/tools/scope-status shows what is open, including tools with no record yet."
+    "A tool repository is scoped automatically, with its record at SCOPE.toml in the root; in a study, every folder under tools/ is, with its record at tools/<name>/SCOPE.toml (template: .agents/templates/SCOPE.toml). .agents/tools/scope-status shows what is open, including tools with no record yet."
   ]
 }

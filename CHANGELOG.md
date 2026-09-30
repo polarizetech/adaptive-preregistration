@@ -5,6 +5,16 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## [Unreleased]
+
+**Behaviour in installed projects:** `tool-scope` now also applies automatically to a repository that is
+itself a tool. Projects with the module get it on `.agents/bin/kit_ap update`.
+
+- **`tool-scope` applies automatically to a tool repository.** A repository whose `TOOL.toml` says
+  `kind = "tool"` (or whose README carries `**Kind:** tool`) is scoped without being asked, with its record at
+  `SCOPE.toml` in the root; `scope-status` reports it as unscoped until that record exists. Tools under a
+  study's `tools/` are scoped as before.
+
 ## [0.4.0] — 2026-09-30
 
 `tool-scope` now applies automatically to every tool in a study. Projects with the module get it on `.agents/bin/kit_ap update`.
