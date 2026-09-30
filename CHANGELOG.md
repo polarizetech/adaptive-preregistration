@@ -5,6 +5,15 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## [Unreleased]
+
+- **`tool-scope` applies automatically to a study's tools.** In a study repository (`STUDY.toml` with
+  `kind = "study"`, or the README kind line `**Kind:** study`), every folder under `tools/` is a tool and is
+  scoped before anything scientific is built in it, with its record at `tools/<name>/SCOPE.toml`. Anywhere
+  else, scoping runs only when the user asks. `scope-status`, run at a study's root, lists tool folders with no
+  record as unscoped; `--check` no longer fails when there is nothing to check. Behaviour in installed projects:
+  yes, after update, for projects with `tool-scope`.
+
 ## [0.3.0] — 2026-09-29
 
 Adds the `tool-scope` module. Nothing changes in a project until it runs `.agents/bin/kit_ap add tool-scope`.

@@ -552,6 +552,45 @@ class ScopeStatusTest(unittest.TestCase):
                 self.assertEqual(r.returncode, 1, r.stdout)
                 self.assertIn("cannot read the record", r.stdout)
 
+    def make_repo(self, kind_line=None, manifest=None, tools=()):
+        """A folder with an optional README kind line or STUDY.toml, and tools/<name>/ folders (True: has a record)."""
+        if kind_line is not None:
+            with open(os.path.join(self.tmp, "README.md"), "w") as f:
+                f.write(f"# Demo\n\n{kind_line}\n")
+        if manifest is not None:
+            with open(os.path.join(self.tmp, "STUDY.toml"), "w") as f:
+                f.write(manifest)
+        for name, scoped in tools:
+            os.makedirs(os.path.join(self.tmp, "tools", name))
+            if scoped:
+                with open(os.path.join(self.tmp, "tools", name, "SCOPE.toml"), "w") as f:
+                    f.write(SCOPE_RECORD.replace('tool = "v1-demo"', f'tool = "{name}"'))
+        return sh(sys.executable, self.TOOL, "--check", self.tmp, check=False)
+
+    def test_study_lists_its_unscoped_tools(self):
+        r = self.make_repo("**Kind:** study · **Stage:** SKETCH",
+                           tools=(("sonifier", False), ("visualizer", True), ("_shared", False)))
+        self.assertEqual(r.returncode, 0, r.stdout)  # unscoped is open, not a contract error
+        self.assertIn("Unscoped tools", r.stdout)
+        self.assertIn("tools/sonifier: no SCOPE.toml yet", r.stdout)
+        self.assertNotIn("tools/visualizer: no SCOPE.toml", r.stdout)
+        self.assertNotIn("_shared", r.stdout)
+        self.assertIn("visualizer (exploratory)", r.stdout)  # its record is still read
+
+    def test_study_by_manifest(self):
+        r = self.make_repo(manifest='kind = "study"\nname = "demo"\n', tools=(("sonifier", False),))
+        self.assertIn("tools/sonifier: no SCOPE.toml yet", r.stdout)
+
+    def test_tools_folder_outside_a_study_is_not_flagged(self):
+        r = self.make_repo("**Kind:** tool · **Stage:** SKETCH", tools=(("scripts", False),))
+        self.assertNotIn("Unscoped", r.stdout)
+        self.assertEqual(r.returncode, 0)
+
+    def test_nothing_to_check_passes(self):
+        r = sh(sys.executable, self.TOOL, "--check", self.tmp, check=False)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("no SCOPE.toml", r.stdout)
+
     def test_finds_every_record_under_a_folder(self):
         for app in ("apps/v1-one", "apps/v2-two", ".agents/templates"):
             os.makedirs(os.path.join(self.tmp, app))
