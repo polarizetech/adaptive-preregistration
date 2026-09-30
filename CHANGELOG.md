@@ -5,7 +5,10 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
-## [Unreleased]
+## [0.6.0] — 2026-09-30
+
+Preregistration works per unit, and every unit starts with a falsifiable claim. `tool-scope` is merged into `prereg`.
+Run `.agents/bin/kit_ap update` in each project.
 
 - **Preregistration works per unit.** A repository that holds several units (apps, sims, tools, calculators,
   dataset analyses) gives each its own experiments in `<unit>/preregistrations/<EID>/`, its own claim and its
