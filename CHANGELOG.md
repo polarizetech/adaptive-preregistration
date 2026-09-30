@@ -5,7 +5,9 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
-## [Unreleased]
+## [0.4.0] — 2026-09-30
+
+`tool-scope` now applies automatically to every tool in a study. Projects with the module get it on `.agents/bin/kit_ap update`.
 
 - **`tool-scope` applies automatically to a study's tools.** In a study repository (`STUDY.toml` with
   `kind = "study"`, or the README kind line `**Kind:** study`), every folder under `tools/` is a tool and is
