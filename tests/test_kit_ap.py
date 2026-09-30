@@ -26,7 +26,7 @@ def minimal_path(tmp):
     d = os.path.join(tmp, "minbin")
     if not os.path.isdir(d):
         os.makedirs(d)
-        for tool in ("git", "bash", "env", "cut", "shasum", "sha256sum", "perl", "date", "cat", "tr", "wc", "dirname"):
+        for tool in ("git", "bash", "env", "cut", "shasum", "sha256sum", "perl", "date", "cat", "tr", "wc", "dirname", "awk"):
             found = shutil.which(tool)
             if found:
                 os.symlink(found, os.path.join(d, tool))
@@ -387,17 +387,90 @@ class SourceNameTest(unittest.TestCase):
 
 
 
-class ToolScopeTest(KitBase):
-    """The tool-scope module installs with prereg, and ships its protocol, template and tool."""
+class ClaimFirstTest(KitBase):
+    """Claim-first scoping is part of prereg; the old tool-scope module is retired into it."""
 
-    def test_installs_with_prereg(self):
-        self.kit("init", "--source", self.src, "--modules", "tool-scope")
-        self.assertEqual(self.lock()["modules"], ["core", "prereg", "tool-scope"])
-        for rel in (".agents/protocols/SCOPE_PROTOCOL.md", ".agents/templates/SCOPE.toml",
-                    ".agents/tools/scope-status"):
+    SCOPE_FILES = (".agents/protocols/SCOPE_PROTOCOL.md", ".agents/templates/SCOPE.toml", ".agents/tools/scope-status")
+
+    def test_prereg_ships_claim_first_scoping(self):
+        self.kit("init", "--source", self.src)
+        for rel in self.SCOPE_FILES:
             self.assertTrue(os.path.exists(os.path.join(self.repo, rel)), rel)
         self.assertTrue(os.access(os.path.join(self.repo, ".agents/tools/scope-status"), os.X_OK))
-        self.assertIn("## Tool scope", self.read("AGENTS.md"))
+        self.assertIn("**Claim first.**", self.read("AGENTS.md"))
+
+    def test_tool_scope_is_retired_into_prereg(self):
+        # The kit as it was: the scoping files belonged to a separate tool-scope module.
+        old = os.path.join(self.src, "modules", "tool-scope")
+        for rel in ("protocols/SCOPE_PROTOCOL.md", "templates/SCOPE.toml", "tools/scope-status"):
+            os.makedirs(os.path.dirname(os.path.join(old, rel)), exist_ok=True)
+            shutil.move(os.path.join(self.src, "modules", "prereg", rel), os.path.join(old, rel))
+        with open(os.path.join(old, "module.json"), "w") as f:
+            json.dump({"name": "tool-scope", "requires": ["prereg"]}, f)
+        self.commit_src("the kit before the merge")
+        self.kit("init", "--source", self.src, "--modules", "tool-scope")
+        self.assertIn("tool-scope", self.lock()["modules"])
+        # The kit now: prereg ships them, tool-scope is gone.
+        for rel in ("protocols/SCOPE_PROTOCOL.md", "templates/SCOPE.toml", "tools/scope-status"):
+            shutil.move(os.path.join(old, rel), os.path.join(self.src, "modules", "prereg", rel))
+        shutil.rmtree(old)
+        self.commit_src("merge tool-scope into prereg")
+        out = self.vendored("update").stdout
+        self.assertIn("[tool-scope] removed: merged into prereg", out)
+        self.assertEqual(self.lock()["modules"], ["core", "prereg"])
+        for rel in self.SCOPE_FILES:
+            self.assertTrue(os.path.exists(os.path.join(self.repo, rel)), rel)
+
+    def test_adding_tool_scope_is_refused(self):
+        self.kit("init", "--source", self.src)
+        r = self.vendored("add", "tool-scope", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("merged into prereg", r.stderr)
+
+
+class UnitExperimentTest(KitBase):
+    """The commit guard and receipts find an experiment by its EID, in any unit."""
+
+    def setUp(self):
+        super().setUp()
+        self.kit("init", "--source", self.src, "--modules", "experiment-pr-log")
+        sh("git", "config", "core.hooksPath", ".agents/githooks", cwd=self.repo)
+        self.exp = os.path.join(self.repo, "sims", "sound-propagation", "preregistrations", "E07-carry")
+        os.makedirs(os.path.join(self.exp, "outputs"))
+
+    def write(self, rel, text):
+        with open(os.path.join(self.exp, rel), "w") as f:
+            f.write(text)
+
+    def commit(self, *paths):
+        sh("git", "add", *paths, cwd=self.repo)
+        return sh("git", "commit", "-qm", "x", cwd=self.repo, check=False)
+
+    def test_guard_follows_the_unit(self):
+        self.write("PREREG.md", "plan v1\n")
+        self.write("outputs/run.csv", "1\n")
+        r = self.commit("sims")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("no E07-carry-prereg tag", r.stdout + r.stderr)
+        sh("git", "reset", "-q", cwd=self.repo)
+        self.assertEqual(self.commit(os.path.join(self.exp, "PREREG.md")).returncode, 0)
+        sh("git", "tag", "-a", "E07-carry-prereg", "-m", "t", cwd=self.repo)
+        self.assertEqual(self.commit(os.path.join(self.exp, "outputs")).returncode, 0)
+        self.write("PREREG.md", "plan v2\n")
+        r = self.commit(os.path.join(self.exp, "PREREG.md"))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("frozen after E07-carry-prereg", r.stdout + r.stderr)
+
+    def test_receipt_finds_the_unit_folder(self):
+        import hashlib
+        self.write("PREREG.md", "plan v1\n")
+        self.write("ENV.lock", "numpy==2.0\n")
+        self.commit(os.path.join(self.exp, "PREREG.md"), os.path.join(self.exp, "ENV.lock"))
+        sh("git", "tag", "-a", "E07-carry-prereg", "-m", "t", cwd=self.repo)
+        body, _ = KitTest._receipt(self, "E07-carry-prereg")
+        self.assertIn("folder: sims/sound-propagation/preregistrations/E07-carry", body)
+        self.assertIn(hashlib.sha256(b"plan v1\n").hexdigest(), body)
+        self.assertIn(hashlib.sha256(b"numpy==2.0\n").hexdigest(), body)
 
 
 SCOPE_RECORD = """\
@@ -475,7 +548,7 @@ reasoning = "Changed my mind."
 class ScopeStatusTest(unittest.TestCase):
     """scope-status implements the record contract in SCOPE_PROTOCOL.md section 9."""
 
-    TOOL = os.path.join(KIT, "modules", "tool-scope", "tools", "scope-status")
+    TOOL = os.path.join(KIT, "modules", "prereg", "tools", "scope-status")
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -552,56 +625,59 @@ class ScopeStatusTest(unittest.TestCase):
                 self.assertEqual(r.returncode, 1, r.stdout)
                 self.assertIn("cannot read the record", r.stdout)
 
-    def make_repo(self, kind_line=None, manifest=None, tools=()):
-        """A folder with an optional README kind line or STUDY.toml, and tools/<name>/ folders (True: has a record)."""
-        if kind_line is not None:
-            with open(os.path.join(self.tmp, "README.md"), "w") as f:
-                f.write(f"# Demo\n\n{kind_line}\n")
-        if manifest is not None:
-            with open(os.path.join(self.tmp, "STUDY.toml"), "w") as f:
-                f.write(manifest)
-        for name, scoped in tools:
-            os.makedirs(os.path.join(self.tmp, "tools", name))
-            if scoped:
-                with open(os.path.join(self.tmp, "tools", name, "SCOPE.toml"), "w") as f:
-                    f.write(SCOPE_RECORD.replace('tool = "v1-demo"', f'tool = "{name}"'))
+    def make_units(self, *units, scoped=()):
+        """Unit folders (each gets a preregistrations/ folder); those in `scoped` also get a SCOPE.toml."""
+        for u in units:
+            os.makedirs(os.path.join(self.tmp, u, "preregistrations"), exist_ok=True)
+            if u in scoped:
+                with open(os.path.join(self.tmp, u, "SCOPE.toml"), "w") as f:
+                    f.write(SCOPE_RECORD.replace('tool = "v1-demo"', f'tool = "{os.path.basename(u)}"'))
         return sh(sys.executable, self.TOOL, "--check", self.tmp, check=False)
 
-    def test_study_lists_its_unscoped_tools(self):
-        r = self.make_repo("**Kind:** study · **Stage:** SKETCH",
-                           tools=(("sonifier", False), ("visualizer", True), ("_shared", False)))
+    def test_units_are_found_by_their_preregistrations_folder(self):
+        os.makedirs(os.path.join(self.tmp, "shared", "helpers"))  # not a unit: no preregistrations/
+        r = self.make_units("sims/sound-propagation", "apps/v1-listener", "calculators/spl", scoped=("apps/v1-listener",))
         self.assertEqual(r.returncode, 0, r.stdout)  # unscoped is open, not a contract error
-        self.assertIn("Unscoped tools", r.stdout)
-        self.assertIn("tools/sonifier: no SCOPE.toml yet", r.stdout)
-        self.assertNotIn("tools/visualizer: no SCOPE.toml", r.stdout)
-        self.assertNotIn("_shared", r.stdout)
-        self.assertIn("visualizer (exploratory)", r.stdout)  # its record is still read
+        self.assertIn("Unscoped units", r.stdout)
+        self.assertIn("sims/sound-propagation: no SCOPE.toml yet", r.stdout)
+        self.assertIn("calculators/spl: no SCOPE.toml yet", r.stdout)
+        self.assertNotIn("apps/v1-listener: no SCOPE.toml", r.stdout)
+        self.assertNotIn("shared", r.stdout)
+        self.assertNotIn("the repository", r.stdout)  # a repo of units isn't itself a unit
+        self.assertIn("v1-listener (exploratory)", r.stdout)  # its record is read
 
-    def test_study_by_manifest(self):
-        r = self.make_repo(manifest='kind = "study"\nname = "demo"\n', tools=(("sonifier", False),))
-        self.assertIn("tools/sonifier: no SCOPE.toml yet", r.stdout)
-
-    def test_tool_repository_is_scoped_at_its_root(self):
-        r = self.make_repo("**Kind:** tool · **Stage:** SKETCH", tools=(("scripts", False),))
-        self.assertEqual(r.returncode, 0, r.stdout)  # unscoped is open, not a contract error
-        self.assertIn("this tool repository (its root): no SCOPE.toml yet", r.stdout)
-        self.assertNotIn("tools/scripts", r.stdout)  # a tool's own tools/ folder isn't a set of tools
-
-    def test_tool_repository_by_manifest_with_a_record(self):
-        with open(os.path.join(self.tmp, "TOOL.toml"), "w") as f:
-            f.write('kind = "tool"\nname = "demo"\n')
-        r = self.make_repo()
-        self.assertIn("this tool repository (its root): no SCOPE.toml yet", r.stdout)
+    def test_a_repo_without_units_is_one_unit(self):
+        r = sh(sys.executable, self.TOOL, "--check", self.tmp, check=False)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("the repository: no SCOPE.toml yet", r.stdout)
         with open(os.path.join(self.tmp, "SCOPE.toml"), "w") as f:
             f.write(SCOPE_RECORD)
         r = sh(sys.executable, self.TOOL, "--check", self.tmp, check=False)
-        self.assertEqual(r.returncode, 0, r.stdout)
         self.assertNotIn("Unscoped", r.stdout)
 
-    def test_nothing_to_check_passes(self):
+    def test_tool_repository_is_one_unit_scoped_at_its_root(self):
+        with open(os.path.join(self.tmp, "TOOL.toml"), "w") as f:
+            f.write('kind = "tool"\nname = "demo"\n')
+        os.makedirs(os.path.join(self.tmp, "tools", "scripts"))  # a tool's helper folder isn't a unit
         r = sh(sys.executable, self.TOOL, "--check", self.tmp, check=False)
-        self.assertEqual(r.returncode, 0)
-        self.assertIn("no SCOPE.toml", r.stdout)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("the repository: no SCOPE.toml yet", r.stdout)
+        self.assertNotIn("tools/scripts", r.stdout)
+
+    def test_earlier_root_experiments_layout_is_one_unit(self):
+        os.makedirs(os.path.join(self.tmp, "experiments", "E01-x"))
+        r = sh(sys.executable, self.TOOL, self.tmp, check=False)
+        self.assertIn("the repository: no SCOPE.toml yet", r.stdout)
+
+    def test_format_2_and_claim_details(self):
+        record = SCOPE_RECORD.replace("format = 1\ntool = ", "format = 2\nunit = ").replace(
+            'feature = "F3"', 'feature = "claim"')
+        r = self.status(record, "--check")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("v1-demo (exploratory)", r.stdout)
+        self.assertIn("not yet stated: concepts, measure, smallest_effect, assumptions", r.stdout)
+        r = self.status(record.replace("unit = ", "tool = "), "--check")  # format 2 names it `unit`
+        self.assertIn("unit is empty", r.stdout)
 
     def test_finds_every_record_under_a_folder(self):
         for app in ("apps/v1-one", "apps/v2-two", ".agents/templates"):

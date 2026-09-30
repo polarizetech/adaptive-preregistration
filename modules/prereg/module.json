@@ -1,7 +1,7 @@
 {
   "name": "prereg",
   "title": "Preregistration",
-  "description": "Adaptive preregistration for model experiments: no run before PREREG, deviations logged, failures close the version.",
+  "description": "Claim first, then predict first: every unit starts with a falsifiable claim; no quotable run before a tagged PREREG; deviations logged; failures close the version.",
   "default": true,
   "requires": []
 }

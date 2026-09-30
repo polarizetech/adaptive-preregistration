@@ -38,9 +38,8 @@ need more (`experiment-pr-log` needs the GitHub CLI, `gh`); `init` prints those 
 | Module | Default | What it does |
 |---|---|---|
 | `core` | always | Where the protocols live, how conflicts are handled, and a session-start check for updates. |
-| `prereg` | ✓ | The preregistration protocol: `PREREG.md`, `DEVIATIONS.md`, `RESULTS.md`, the experiment registry and milestone tags. [Protocol](modules/prereg/protocols/PREREG_PROTOCOL.md) |
+| `prereg` | ✓ | Claim first, then predict first. Every unit (an app, sim, tool, calculator or dataset analysis; a folder with `preregistrations/`, or the repo itself) starts with a falsifiable claim, settled with the user and kept in its `SCOPE.toml` with the evidence and decision behind each scientific feature. Then `PREREG.md`, `DEVIATIONS.md`, `RESULTS.md`, the experiment registry and milestone tags, per unit. `scope-status` lists unscoped units and what's open. [Preregistration](modules/prereg/protocols/PREREG_PROTOCOL.md) · [Scoping](modules/prereg/protocols/SCOPE_PROTOCOL.md) |
 | `experiment-pr-log` | | One branch and draft PR per experiment, tag receipts posted to the PR, and an optional commit guard that refuses outputs before `-prereg` and edits to a frozen plan. [Protocol](modules/experiment-pr-log/protocols/EXPERIMENT_PR_LOG.md) |
-| `tool-scope` | | Scoping a research tool with the user before it's built, automatically for every folder under a study's `tools/` and on request elsewhere: the claim first, in the user's words; then features; then an evidence basis (established, supported, derived, override, gap) and the user's recorded decision for every scientific feature. Overrides become preregistered predictions. Keeps a `SCOPE.toml` record per tool, with `scope-status` to check it. Requires `prereg`. [Protocol](modules/tool-scope/protocols/SCOPE_PROTOCOL.md) |
 
 ## What gets installed
 

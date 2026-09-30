@@ -5,6 +5,23 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## [Unreleased]
+
+- **Preregistration works per unit.** A repository that holds several units (apps, sims, tools, calculators,
+  dataset analyses) gives each its own experiments in `<unit>/preregistrations/<EID>/`, its own claim and its
+  own versions; a unit is any folder with a `preregistrations/` folder, and any other repository is one unit.
+  `EXPERIMENTS.md` stays at the root, with a Unit column; EIDs are unique per repository; version tags start
+  with the unit's folder name when a repository has more than one versioned unit. The earlier root
+  `experiments/<EID>/` layout still works. The commit guard, tag receipts and status line find an
+  experiment's folder by its EID. Behaviour in installed projects: yes, after update.
+- **Claim first, for every unit.** `tool-scope` is merged into `prereg`: every unit starts with a falsifiable
+  claim, settled with the user and recorded verbatim, before anything is built in it. The claim step now also
+  asks, one question at a time, for what the terms mean, how it will be measured, the smallest effect that
+  would matter, and what a test assumes, following the derivation-chain and smallest-effect literature
+  (Scheel et al. 2021; Lakens 2022; both read in full, passages checked). Overrides are preregistered in the
+  unit's own `preregistrations/`. `SCOPE.toml` is format 2 (`unit` instead of `tool`, optional claim details);
+  format 1 is still read. `scope-status` lists unscoped units. Projects with `tool-scope` drop it on their next
+  update and keep its files through `prereg`. Behaviour in installed projects: yes, after update.
 ## [0.5.0] — 2026-09-30
 
 **Behaviour in installed projects:** `tool-scope` now also applies automatically to a repository that is
