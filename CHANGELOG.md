@@ -5,6 +5,14 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## [Unreleased]
+
+- **A study's manifest lists its units.** Units are now also read from `STUDY.toml` (`[[apps]]`, `[[sims]]`,
+  `[[datasets]]`, `[[calculators]]`; an entry's `path` or its kind's default folder), so a unit is scoped claim
+  first from the moment it is declared, not only once it has a `preregistrations/` folder. Units pinned to
+  another repository and superseded or abandoned apps are left out. `scope-status` lists them. Behaviour in
+  installed projects: yes, after update, in repositories that have a `STUDY.toml`.
+
 ## [0.7.0] — 2026-10-01
 
 A new module for releasing tools, and tool repositories keep their research elsewhere.
