@@ -5,7 +5,9 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
-## [Unreleased]
+## [0.8.0] — 2026-10-01
+
+A study's units can be declared in its manifest. Run `.agents/bin/kit_ap update` in each project.
 
 - **A study's manifest lists its units.** Units are now also read from `STUDY.toml` (`[[apps]]`, `[[sims]]`,
   `[[datasets]]`, `[[calculators]]`; an entry's `path` or its kind's default folder), so a unit is scoped claim
