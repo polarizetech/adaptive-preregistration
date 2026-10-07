@@ -1,7 +1,7 @@
 {
   "name": "prereg",
   "title": "Preregistration",
-  "description": "Claim first, then predict first: every unit starts with a falsifiable claim; no quotable run before a tagged PREREG; deviations logged; failures close the version.",
+  "description": "A claim or an exploratory label, then predict first: a unit starts with a falsifiable claim unless it is marked exploratory; no quotable run before a tagged PREREG; deviations logged; failures close the version.",
   "default": true,
   "requires": []
 }

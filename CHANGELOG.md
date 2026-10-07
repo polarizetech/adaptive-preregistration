@@ -5,6 +5,31 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## [0.9.0] — 2026-10-07
+
+A unit can be exploratory, and the claim step is one question. Run `.agents/bin/kit_ap update` in each project.
+
+- **Three stages: exploratory, testing, production.** A unit the user marks exploratory needs no claim and no
+  evidence basis or decision for its features. The assistant records a build note from the request
+  (`[exploration]`: what is being built, what is already known, the date), labels the unit exploratory, and
+  builds. Nothing it shows is a finding, and it has no preregistered experiments: preregistering the first one
+  is when its claim is settled and it moves to testing. A unit that isn't marked exploratory starts at testing,
+  with its claim, as before.
+- **The claim step is one question**: the claim and what would count against it. The follow-up questions
+  (what its terms mean, how it is measured, the smallest effect that matters, what a test assumes) are no
+  longer asked before building. They are stated in the first experiment's `PREREG.md` (§1, §3, §8), which
+  `claim.experiments` names.
+- **`SCOPE.toml` is format 3**: `stage` is `exploratory`, `testing` or `production`; `[exploration]` holds the
+  build note; `[claim]` drops the detail fields and gains `experiments`. Formats 1 and 2 are still read: the
+  stage they wrote as `exploratory` required a claim, so it is read and shown as `testing`, and nothing in an
+  existing record needs editing. `scope-status` reports an exploratory record's note and asks for no claim,
+  basis or decision; `--check` still fails it on a malformed field.
+- `PREREG_PROTOCOL.md` rule 0 now reads "a claim before any experiment".
+
+**Behaviour in installed projects:** yes, after update. Assistants ask one claim question instead of several,
+stop asking for a claim or evidence in units the user calls exploratory, and existing records show `testing`
+where they showed `exploratory`.
+
 ## [0.8.0] — 2026-10-01
 
 A study's units can be declared in its manifest. Run `.agents/bin/kit_ap update` in each project.

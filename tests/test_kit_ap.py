@@ -397,7 +397,7 @@ class ClaimFirstTest(KitBase):
         for rel in self.SCOPE_FILES:
             self.assertTrue(os.path.exists(os.path.join(self.repo, rel)), rel)
         self.assertTrue(os.access(os.path.join(self.repo, ".agents/tools/scope-status"), os.X_OK))
-        self.assertIn("**Claim first.**", self.read("AGENTS.md"))
+        self.assertIn("**A claim, or an exploratory label.**", self.read("AGENTS.md"))
 
     def test_tool_scope_is_retired_into_prereg(self):
         # The kit as it was: the scoping files belonged to a separate tool-scope module.
@@ -759,7 +759,7 @@ class ScopeStatusTest(unittest.TestCase):
         self.assertNotIn("apps/v1-listener: no SCOPE.toml", r.stdout)
         self.assertNotIn("shared", r.stdout)
         self.assertNotIn("the repository", r.stdout)  # a repo of units isn't itself a unit
-        self.assertIn("v1-listener (exploratory)", r.stdout)  # its record is read
+        self.assertIn("v1-listener (testing)", r.stdout)  # its record is read
 
     def test_units_listed_in_a_study_manifest(self):
         with open(os.path.join(self.tmp, "STUDY.toml"), "w") as f:
@@ -823,13 +823,70 @@ slug = "not-made-yet"
         r = sh(sys.executable, self.TOOL, self.tmp, check=False)
         self.assertIn("the repository: no SCOPE.toml yet", r.stdout)
 
+    EXPLORATORY = """\
+format = 3
+unit = "v1-sketch"
+stage = "exploratory"
+
+[exploration]
+building = "A viewer for the raw recordings"
+known = "Nothing measured yet"
+started = "2026-10-07"
+
+[[features]]
+id = "F1"
+name = "Band power"
+kind = "science"
+status = "accepted"
+"""
+
+    def test_exploratory_unit_needs_no_claim_or_evidence(self):
+        r = self.status(self.EXPLORATORY, "--check")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("v1-sketch (exploratory)", r.stdout)
+        self.assertIn('Exploring: "A viewer for the raw recordings" (since 2026-10-07)', r.stdout)
+        self.assertIn("nothing it shows is a finding", r.stdout)
+        self.assertIn("Nothing open at this stage", r.stdout)
+        for absent in ("Errors", "the claim isn't settled", "no basis yet", "`does` is empty"):
+            self.assertNotIn(absent, r.stdout)
+        self.assertIn("it needs its claim", r.stdout)  # what stands before production
+
+    def test_exploratory_record_still_has_a_build_note_and_valid_fields(self):
+        r = self.status(self.EXPLORATORY.replace('building = "A viewer for the raw recordings"', 'building = ""'), "--check")
+        self.assertEqual(r.returncode, 0, r.stdout)  # open, not an error
+        self.assertIn("the build note is empty", r.stdout)
+        r = self.status(self.EXPLORATORY.replace('started = "2026-10-07"', 'started = "today"'), "--check")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("exploration.started must be YYYY-MM-DD", r.stdout)
+        r = self.status(self.EXPLORATORY.replace('kind = "science"', 'kind = "ui"'), "--check")
+        self.assertEqual(r.returncode, 1, r.stdout)
+
+    def test_format_3_testing_stage_needs_its_claim(self):
+        testing = self.EXPLORATORY.replace('stage = "exploratory"', 'stage = "testing"')
+        r = self.status(testing, "--check")
+        self.assertIn("the claim isn't settled", r.stdout)
+        self.assertIn("F1: `does` is empty", r.stdout)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        r = self.status(SCOPE_RECORD.replace('stage = "exploratory"', 'stage = "testing"'), "--check")
+        self.assertIn("stage must be one of exploratory, production", r.stdout)  # format 1 has no testing stage
+
+    def test_the_template_is_a_valid_record(self):
+        with open(os.path.join(KIT, "modules", "prereg", "templates", "SCOPE.toml")) as f:
+            template = f.read()
+        r = self.status(template.replace('unit = ""', 'unit = "demo"'), "--check")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("demo (testing)", r.stdout)
+        self.assertIn("the claim isn't settled", r.stdout)
+
     def test_format_2_and_claim_details(self):
         record = SCOPE_RECORD.replace("format = 1\ntool = ", "format = 2\nunit = ").replace(
             'feature = "F3"', 'feature = "claim"')
         r = self.status(record, "--check")
         self.assertEqual(r.returncode, 0, r.stdout)
-        self.assertIn("v1-demo (exploratory)", r.stdout)
-        self.assertIn("not yet stated: concepts, measure, smallest_effect, assumptions", r.stdout)
+        self.assertIn("v1-demo (testing)", r.stdout)  # formats 1 and 2 wrote today's testing stage as `exploratory`
+        self.assertIn("details: stated when its first experiment is preregistered", r.stdout)
+        r = self.status(record.replace('decided = "2026-09-29"', 'decided = "2026-09-29"\nexperiments = ["E01-bands"]', 1))
+        self.assertIn("details stated in: E01-bands", r.stdout)
         r = self.status(record.replace("unit = ", "tool = "), "--check")  # format 2 names it `unit`
         self.assertIn("unit is empty", r.stdout)
 
