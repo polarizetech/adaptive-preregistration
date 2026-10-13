@@ -5,6 +5,14 @@ version changes what the protocol requires or breaks installed projects; a minor
 Every entry says whether it changes **behaviour in installed projects**, because an update applies it
 there.
 
+## Unreleased
+
+- **An app version is found at `apps/<slug>/<version>`.** A study manifest's `[[apps]]` entry with no `path`
+  is looked for there first, and then at the earlier `apps/<version>-<slug>`, so a study laid out either way
+  has its apps found by `scope-status`. Where a study keeps its units is still the organisation's convention,
+  not this protocol's. **Behaviour in installed projects:** none for a project on the earlier layout; a
+  project on the new one no longer needs `path` on every app.
+
 ## [0.9.0] — 2026-10-07
 
 A unit can be exploratory, and the claim step is one question. Run `.agents/bin/kit_ap update` in each project.
