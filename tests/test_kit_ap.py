@@ -779,6 +779,10 @@ status = "superseded"
 version = "v2"
 slug = "listener"
 
+[[apps]]
+version = "v1"
+slug = "mapper"
+
 [[sims]]
 slug = "propagation"
 path = "projects/propagation"    # adopted where it already was
@@ -791,11 +795,12 @@ ref = "model-v0.2.0"
 [[calculators]]
 slug = "not-made-yet"
 ''')
-        for d in ("apps/v1-first-look", "apps/v2-listener", "projects/propagation", "projects/unlisted"):
+        for d in ("apps/v1-first-look", "apps/v2-listener", "apps/mapper/v1", "projects/propagation", "projects/unlisted"):
             os.makedirs(os.path.join(self.tmp, d))
         r = sh(sys.executable, self.TOOL, "--check", self.tmp, check=False)
         self.assertEqual(r.returncode, 0, r.stdout)
-        self.assertIn("apps/v2-listener: no SCOPE.toml yet", r.stdout)       # declared, before any preregistration
+        self.assertIn("apps/v2-listener: no SCOPE.toml yet", r.stdout)  # declared, in the earlier layout
+        self.assertIn("apps/mapper/v1: no SCOPE.toml yet", r.stdout)         # an app's folder, then its version
         self.assertIn("projects/propagation: no SCOPE.toml yet", r.stdout)   # at its declared path
         for absent in ("v1-first-look", "chorus", "not-made-yet", "unlisted", "the repository"):
             self.assertNotIn(absent, r.stdout)
