@@ -407,6 +407,8 @@ def find_units(root):
     root = os.path.normpath(root)
     if os.path.isdir(os.path.join(root, "experiments")) and root not in units:
         units.insert(0, root)
+    if units and os.path.exists(os.path.join(root, "TOOL.toml")) and root not in units:
+        units.insert(0, root)  # a tool is a unit beside its comparison units (TOOL_VERSIONING.md §1a)
     return units or [root]
 
 

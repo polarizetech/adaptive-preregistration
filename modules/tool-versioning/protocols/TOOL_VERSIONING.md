@@ -3,9 +3,10 @@
 **Applies to:** everyone who changes or releases this repo: people, scripts and coding assistants.
 **Status of this file:** binding. If a task conflicts with it, stop and say so before doing the task.
 **For:** tool repos (libraries, instruments, acquisition bridges, file-format code) whose output other people's
-research consumes. A tool repo holds no experiments. It has the `prereg` module too, which scopes the tool's
-scientific features claim first (`SCOPE_PROTOCOL.md`); this protocol governs the tool's versions and
-releases, and nothing in the tool itself is preregistered (§8).
+research consumes. A tool repo holds no experiments except **comparison units** (§1a): sims and dataset
+analyses that compare the tool's functionality against other tools. It has the `prereg` module too, which
+scopes the tool's scientific features claim first (`SCOPE_PROTOCOL.md`); this protocol governs the tool's
+versions and releases, and nothing in the tool itself is preregistered outside its comparison units (§8).
 **Installed by:** the KIT Adaptive Preregistration `tool-versioning` module, which also adds the one-line rule to `AGENTS.md`.
 **License:** CC BY 4.0, from [KIT Adaptive Preregistration](https://github.com/polarizetech/adaptive-preregistration). Reuse it with credit.
 
@@ -13,9 +14,12 @@ releases, and nothing in the tool itself is preregistered (§8).
 
 ## 0. The eight rules (read these even if you read nothing else)
 
-1. **A tool holds only the tool.** No experiments, no results, no measurements of anyone's particular device or
-   subjects, no `EXPERIMENTS.md`, `experiments/` or `preregistrations/`. Findings about the tool's output live in the research repo
-   that produced them, which cites the tool's version.
+1. **A tool holds only the tool, and its comparisons with other tools.** No experiments about the world, no
+   measurements of anyone's particular device or subjects, no `experiments/` or `preregistrations/` at the root.
+   The one exception is comparison units (§1a): `sims/<slug>/` and `datasets/<slug>/` that preregister
+   predictions about the tool's output against other tools on declared inputs and check whether each run is
+   correct, as an extension of the test suite. Findings about the world live in the research repo that
+   produced them, which cites the tool's version.
 2. **One version, tagged.** SemVer, `0.MINOR.PATCH` until 1.0. The version lives in one place and is mirrored in
    `CITATION.cff` (and `TOOL.toml`, if the repo has one); they all agree. Every release is an annotated tag `vX.Y.Z` with the ISO date in its message,
    pushed, and never moved or deleted.
@@ -30,8 +34,9 @@ releases, and nothing in the tool itself is preregistered (§8).
    the tool refuses them until they are re-tested.
 7. **Experimental features are siloed** and labelled experimental in code, UI and docs. Core never depends on
    them.
-8. **Claims about the tool are experiments,** and they are preregistered in a research repo against a pinned
-   tag, not in the tool.
+8. **Claims about the tool are experiments.** A comparison of the tool's output with other tools on declared
+   inputs is preregistered in the tool's own comparison unit (§1a); any other claim (accuracy against the
+   world, a device's noise floor, a biological interpretation) in a research repo, against a pinned tag.
 
 ---
 
@@ -40,8 +45,8 @@ releases, and nothing in the tool itself is preregistered (§8).
 The tool repo holds code, its tests, its documentation, and fixtures that test the code (synthetic signals,
 small reference files whose provenance is stated). It does not hold:
 
-- experiments, `EXPERIMENTS.md`, `experiments/`, `preregistrations/`, `PREREG.md`, `RESULTS.md`;
-- results: figures, tables or numbers about what the tool measured;
+- experiments, `experiments/`, `preregistrations/`, `PREREG.md`, `RESULTS.md`, outside its comparison units (§1a);
+- results: figures, tables or numbers about what the tool measured, outside its comparison units;
 - measurements of a particular device, rig or subject, including "validation" runs of this copy of the
   hardware. A rig's noise floor is a finding about that rig; it belongs to the research repo that measured it;
 - recordings, personal data, keys.
@@ -51,7 +56,34 @@ repo, which states the tool version it ran against (`vX.Y.Z` and the commit). If
 is a tool release, and the finding stays where it was made.
 
 Documentation may state what the tool is *designed* to do (declared sample rate, algorithm, units). It may
-not state measured performance unless it cites the research repo and the tool version that measured it.
+not state measured performance unless it cites the research repo, or the comparison unit, and the tool
+version that measured it.
+
+## 1a. Comparison units
+
+A tool repo may hold **sims** (`sims/<slug>/`) and **dataset analyses** (`datasets/<slug>/`) as long as they
+are about comparing the tool's functionality against other tools: preregistering predictions based on inputs
+and seeing whether the run is correct. They are an extension of the test suite, kept to the standard of an
+experiment. Each one:
+
+- **is a unit** (`PREREG_PROTOCOL.md` §1) with its own `SCOPE.toml`, which names what it compares:
+  `compares = ["<this tool>", "<other tool> <version>", …]`, the tool itself and at least one other. It may be
+  exploratory (`SCOPE_PROTOCOL.md` §2) until its first preregistered comparison.
+- **predicts outputs, not the world.** Its claims and criteria are about what the tools compute on declared
+  inputs: agreement, divergence, correctness against a reference implementation or an analytic answer. A
+  claim about brains, subjects, devices or physical systems belongs in a research repo, even when a
+  comparison unit motivated it.
+- **keeps its preregistrations and results inside the unit** (`<unit>/preregistrations/<EID>/`), lists its
+  EIDs in the root `EXPERIMENTS.md` (which then lists comparison units only), and records the tool version
+  (`vX.Y.Z` or commit) and every other tool's pinned version that each run used.
+- **depends on the tool, never the reverse** (§5). Its extra dependencies (another simulator, a reference
+  library) stay out of the tool's runtime dependencies: a dev or optional dependency group.
+- **is re-run when an output it predicts changes.** A release whose `### Outputs changed` touches a comparison
+  unit's inputs or outputs names it there, like a consumer (§3), and its next result states the new version.
+
+A comparison result is evidence about the tool's behaviour at a version. It is not a research finding and is
+not written to the research corpus; a study that relies on it cites the unit, its EID and the tool version, or
+reruns it.
 
 ---
 
@@ -96,7 +128,7 @@ consumer parses.
   ```
 
   Each line names the function, route, field or constant, the old and new behaviour, and the consumers from
-  the Consumers list (§4) that must re-run, or `none`.
+  the Consumers list (§4) and the comparison units (§1a) that must re-run, or `none`.
 - An `### Outputs changed` section is never empty. A release with no output change leaves the section out.
 
 ---
@@ -185,10 +217,13 @@ Experimental features are allowed. They are:
 ## 8. Claims about the tool
 
 Predict-first still applies to anything *claimed* about the tool: accuracy, noise floor, timing, agreement
-with a reference instrument. (Choosing *what* scientific features the tool implements, and on what evidence,
-is a different step: `SCOPE_PROTOCOL.md`, whose overrides in a tool are preregistered in the research corpus.) Such a claim is an experiment. It is preregistered in a research repo that uses
-`PREREG_PROTOCOL.md` (a validation study of the tool is research like any other), against a pinned tag of the
-tool, and its results stay there. The tool's docs may link to it, with the tag it tested.
+with a reference instrument or another tool. (Choosing *what* scientific features the tool implements, and on
+what evidence, is a different step: `SCOPE_PROTOCOL.md`, whose overrides in a tool are preregistered in the
+research corpus.) Such a claim is an experiment. A comparison of the tool's output with other tools on declared
+inputs is preregistered in one of the tool's comparison units (§1a), and its results stay there. Any other claim
+is preregistered in a research repo that uses `PREREG_PROTOCOL.md` (a validation study of the tool against the
+world is research like any other), against a pinned tag of the tool, and its results stay there. The tool's
+docs may link to either, with the tag it tested.
 
 ---
 
@@ -207,7 +242,10 @@ tool, and its results stay there. The tool's docs may link to it, with the tag i
 - `CHANGELOG.md` has a heading for that version;
 - if that heading is dated (released), the annotated tag `vX.Y.Z` exists, and its message has an ISO date;
 - a PATCH release has no `### Outputs changed` section;
-- there is no `EXPERIMENTS.md`, `experiments/` or `preregistrations/` at the repo root.
+- there is no `experiments/` or `preregistrations/` at the repo root, and no `preregistrations/` anywhere
+  except directly inside a comparison unit (`sims/<slug>/` or `datasets/<slug>/`);
+- every comparison unit has a `SCOPE.toml` whose `compares` names the tool and at least one other tool;
+- a root `EXPERIMENTS.md` exists only when the repo has comparison units.
 
 It exits 1 if any check fails. Run it before tagging and in CI. It can't tell whether an output changed; that
 is the author's judgement, recorded in the changelog.

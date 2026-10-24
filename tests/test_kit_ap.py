@@ -615,6 +615,31 @@ class ToolVersioningTest(KitBase):
             self.write(research, "x\n")
             self.assertIn(f"{research.split('/')[0]} exists", self.release_check().stdout)
 
+    def test_comparison_units_may_hold_preregistrations(self):
+        """TOOL_VERSIONING.md §1a: sims/ and datasets/ comparing the tool with other tools are allowed."""
+        self.tool_repo(heading="## [0.2.0]")
+        self.write("sims/vs-other/SCOPE.toml", 'format = 3\nunit = "vs-other"\nstage = "exploratory"\n'
+                   'compares = [\n  "t 0.2.0",\n  "other 1.0.0",\n]\n')
+        self.write("sims/vs-other/preregistrations/E01-agree/PREREG.md", "x\n")
+        self.write("datasets/bench/SCOPE.toml", 'format = 3\nunit = "bench"\nstage = "exploratory"\n'
+                   'compares = ["t 0.2.0", "ref 2.1"]\n')
+        self.write("EXPERIMENTS.md", "| EID | Unit |\n")
+        r = self.release_check()
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_comparison_unit_failures(self):
+        self.tool_repo(heading="## [0.2.0]")
+        self.write("EXPERIMENTS.md", "| EID | Unit |\n")
+        self.assertIn("no comparison units", self.release_check().stdout)
+        self.write("sims/solo/SCOPE.toml", 'format = 3\nunit = "solo"\nstage = "exploratory"\ncompares = ["t"]\n')
+        self.assertIn("sims/solo/SCOPE.toml needs compares", self.release_check().stdout)
+        self.write("datasets/x/preregistrations/E02/PREREG.md", "x\n")
+        self.assertIn("datasets/x has preregistrations/ but no SCOPE.toml", self.release_check().stdout)
+        self.write("pkg/preregistrations/E03/PREREG.md", "x\n")
+        self.assertIn("pkg/preregistrations exists", self.release_check().stdout)
+        self.write("sims/solo/deep/preregistrations/E04/PREREG.md", "x\n")
+        self.assertIn("sims/solo/deep/preregistrations exists", self.release_check().stdout)
+
     def test_a_patch_may_not_change_outputs(self):
         self.tool_repo(version="0.2.1", heading="## [0.2.1]\n\n### Outputs changed\n- `rate` now measured")
         r = self.release_check()
@@ -760,6 +785,13 @@ class ScopeStatusTest(unittest.TestCase):
         self.assertNotIn("shared", r.stdout)
         self.assertNotIn("the repository", r.stdout)  # a repo of units isn't itself a unit
         self.assertIn("v1-listener (testing)", r.stdout)  # its record is read
+
+    def test_a_tool_is_a_unit_beside_its_comparison_units(self):
+        with open(os.path.join(self.tmp, "TOOL.toml"), "w") as f:
+            f.write('kind = "tool"\nname = "t"\nversion = "0.1.0"\n')
+        r = self.make_units("sims/vs-other")
+        self.assertIn("sims/vs-other: no SCOPE.toml yet", r.stdout)
+        self.assertIn("the repository", r.stdout)  # the tool itself is still a unit, and unscoped here
 
     def test_units_listed_in_a_study_manifest(self):
         with open(os.path.join(self.tmp, "STUDY.toml"), "w") as f:
