@@ -7,19 +7,22 @@ there.
 
 ## Unreleased
 
-- **A tool repo may hold comparison benches.** `benches/<slug>/` (TOOL_VERSIONING.md §1b) runs like part of
-  the test suite against reference implementations in other repos, pinned by tag. Its `SCOPE.toml` declares
-  each reference under `[[references]]` (repo, tag, the tag's full commit, subdirectory, licence, and whether
-  it is imported, `runs = "python"`, or run as a separate process, `runs = "process"`, as GPL code in an MIT
-  tool must be); its own environment pins each imported reference at that tag; `tolerances.toml` holds bounds
-  the owner chose before scoring, and a later change is a recorded revision followed by a re-run; results
-  stay in `results/<tool version>.json`. A bench is a test, not an experiment: no claim and no
-  preregistrations, while a comparison that is an experiment stays a comparison unit (§1a). Every bench is
-  re-run for every release, and a failing bench blocks it unless the CHANGELOG entry names it under
-  `### Benches` with why. `release-check` checks the declared references, tolerances before results, and at
-  a released version each bench's result. **Behaviour in installed projects:** yes, after update, in tool repos
-  with a `benches/` folder only: `release-check` fails a bench without pinned references, results without
-  tolerances, and a release without each bench's passing (or named) result. Nothing changes elsewhere.
+- **Bench sims in a tool.** A sim in the tool's `sims/<slug>/` whose `SCOPE.toml` says `kind = "bench"`
+  (TOOL_VERSIONING.md §1b) runs like part of the test suite against reference implementations in other repos,
+  pinned by tag. Its `SCOPE.toml` declares each reference under `[[references]]` (repo, tag, the tag's full
+  commit, subdirectory, licence, and whether it is imported, `runs = "python"`, or run as a separate process,
+  `runs = "process"`, as GPL code in an MIT tool must be); its own environment pins each imported reference
+  at that tag; `tolerances.toml` holds bounds the owner chose before scoring, and a later change is a
+  recorded revision followed by a re-run; results stay in `results/<tool version>.json`. The person's
+  decisions (2026-10-27): keep the name sims, "a sim that's in a tool is a little bit different than a sim
+  that's in a study"; a tool has no `sims/` folder until it has a sim; in a tool, not meeting the sim's
+  preregistered tolerances "is essentially a failure", so a bench sim's tolerances are its preregistration
+  and it has no `preregistrations/` folder; and bench sims are not run automatically but "when tagging a new
+  version". A failing bench sim blocks the release unless the CHANGELOG entry names it under `### Benches`
+  with why. `release-check` checks the declared references, tolerances before results, and at a released
+  version each bench sim's result. **Behaviour in installed projects:** yes, after update, in tool repos with
+  a bench sim only: `release-check` fails one without pinned references, results without tolerances, and a
+  release without its passing (or named) result. Nothing changes elsewhere.
 
 - **A tool repo may hold comparison units.** `sims/<slug>/` and `datasets/<slug>/` are allowed in a tool repo
   "as long as they are about comparing the tool's functionality against other tools (aka preregistering

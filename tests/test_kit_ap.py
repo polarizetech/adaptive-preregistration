@@ -645,46 +645,50 @@ class ToolVersioningTest(KitBase):
                    'licence = "MIT"\nruns = "python"\npackage = "ref"\n')
 
     def test_a_bench_declares_pinned_references(self):
-        """TOOL_VERSIONING.md §1b: a bench pins each reference by tag and full commit, and holds no prereg."""
+        """TOOL_VERSIONING.md §1b: a bench sim pins each reference by tag and full commit, and holds no prereg."""
         self.tool_repo(heading="## [0.2.0]")
-        self.write("benches/vs-ref/SCOPE.toml", self.BENCH_SCOPE)
+        self.write("sims/vs-other/SCOPE.toml", 'format = 3\nunit = "vs-other"\ncompares = ["t 0.2.0", "o 1"]\n'
+                   '\n[claim]\nkind = "bench"\n')  # a comparison unit, not a bench sim: no references needed
+        self.assertEqual(self.release_check().returncode, 0, self.release_check().stdout)
+        self.write("sims/vs-ref/SCOPE.toml", self.BENCH_SCOPE)
         r = self.release_check()
         self.assertEqual(r.returncode, 0, r.stdout)
-        self.write("benches/vs-ref/SCOPE.toml", self.BENCH_SCOPE.replace('"ref/v1.0.0"\ncommit', '"main"\ncommit')
+        self.write("sims/vs-ref/SCOPE.toml", self.BENCH_SCOPE.replace('"ref/v1.0.0"\ncommit', '"main"\ncommit')
                    .replace("a" * 40, "abc123"))
         out = self.release_check().stdout
         self.assertIn("tag 'main' is not a release tag", out)
         self.assertIn("commit must be the tag's full 40-character commit", out)
-        self.write("benches/empty/README.md", "x\n")
-        self.assertIn("benches/empty declares no [[references]]", self.release_check().stdout)
-        self.write("benches/vs-ref/preregistrations/E01/PREREG.md", "x\n")
-        self.assertIn("a bench is a test, not an experiment", self.release_check().stdout)
+        self.write("sims/empty/SCOPE.toml", 'format = 3\nunit = "empty"\nkind = "bench"  # a bench sim\n'
+                   'compares = ["t 0.2.0", "ref 1"]\n')
+        self.assertIn("sims/empty declares no [[references]]", self.release_check().stdout)
+        self.write("sims/vs-ref/preregistrations/E01/PREREG.md", "x\n")
+        self.assertIn("tolerances are its preregistration", self.release_check().stdout)
 
     def test_bench_results_need_tolerances(self):
         self.tool_repo(heading="## [0.2.0]")
-        self.write("benches/vs-ref/SCOPE.toml", self.BENCH_SCOPE)
-        self.write("benches/vs-ref/results/0.2.0.json", '{"passed": true}\n')
+        self.write("sims/vs-ref/SCOPE.toml", self.BENCH_SCOPE)
+        self.write("sims/vs-ref/results/0.2.0.json", '{"passed": true}\n')
         self.assertIn("results but no tolerances.toml", self.release_check().stdout)
-        self.write("benches/vs-ref/tolerances.toml", 'decided_by = "owner"\n')
+        self.write("sims/vs-ref/tolerances.toml", 'decided_by = "owner"\n')
         r = self.release_check()
         self.assertEqual(r.returncode, 0, r.stdout)
 
     def test_a_release_carries_every_bench_result(self):
         self.tool_repo()
         sh("git", "tag", "-a", "v0.2.0", "-m", "2026-09-20 first minor", cwd=self.repo)
-        self.write("benches/vs-ref/SCOPE.toml", self.BENCH_SCOPE)
-        self.write("benches/vs-ref/tolerances.toml", 'decided_by = "owner"\n')
-        self.assertIn("benches/vs-ref has no results/0.2.0.json", self.release_check().stdout)
-        self.write("benches/vs-ref/results/0.2.0.json", '{"passed": false}\n')
-        self.assertIn("benches/vs-ref failed at 0.2.0", self.release_check().stdout)
+        self.write("sims/vs-ref/SCOPE.toml", self.BENCH_SCOPE)
+        self.write("sims/vs-ref/tolerances.toml", 'decided_by = "owner"\n')
+        self.assertIn("sims/vs-ref has no results/0.2.0.json", self.release_check().stdout)
+        self.write("sims/vs-ref/results/0.2.0.json", '{"passed": false}\n')
+        self.assertIn("sims/vs-ref failed at 0.2.0", self.release_check().stdout)
         self.assertEqual(self.release_check().returncode, 1)
-        log = self.read("CHANGELOG.md").replace("- first\n", "- first\n\n### Benches\n- benches/vs-ref: the "
+        log = self.read("CHANGELOG.md").replace("- first\n", "- first\n\n### Benches\n- sims/vs-ref: the "
                                                 "reference has a known off-by-one; reported upstream.\n")
         self.write("CHANGELOG.md", log)
         r = self.release_check()
         self.assertEqual(r.returncode, 0, r.stdout)
         self.assertIn("named under ### Benches", r.stdout)
-        self.write("benches/vs-ref/results/0.2.0.json", '{"passed": true}\n')
+        self.write("sims/vs-ref/results/0.2.0.json", '{"passed": true}\n')
         self.assertEqual(self.release_check().returncode, 0)
 
     def test_a_patch_may_not_change_outputs(self):
