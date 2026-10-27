@@ -7,6 +7,20 @@ there.
 
 ## Unreleased
 
+- **A tool repo may hold comparison benches.** `benches/<slug>/` (TOOL_VERSIONING.md §1b) runs like part of
+  the test suite against reference implementations in other repos, pinned by tag. Its `SCOPE.toml` declares
+  each reference under `[[references]]` (repo, tag, the tag's full commit, subdirectory, licence, and whether
+  it is imported, `runs = "python"`, or run as a separate process, `runs = "process"`, as GPL code in an MIT
+  tool must be); its own environment pins each imported reference at that tag; `tolerances.toml` holds bounds
+  the owner chose before scoring, and a later change is a recorded revision followed by a re-run; results
+  stay in `results/<tool version>.json`. A bench is a test, not an experiment: no claim and no
+  preregistrations, while a comparison that is an experiment stays a comparison unit (§1a). Every bench is
+  re-run for every release, and a failing bench blocks it unless the CHANGELOG entry names it under
+  `### Benches` with why. `release-check` checks the declared references, tolerances before results, and at
+  a released version each bench's result. **Behaviour in installed projects:** yes, after update, in tool repos
+  with a `benches/` folder only: `release-check` fails a bench without pinned references, results without
+  tolerances, and a release without each bench's passing (or named) result. Nothing changes elsewhere.
+
 - **A tool repo may hold comparison units.** `sims/<slug>/` and `datasets/<slug>/` are allowed in a tool repo
   "as long as they are about comparing the tool's functionality against other tools (aka preregistering
   predictions based on inputs and seeing if the run is correct - essentially treating these like an extension

@@ -5,6 +5,6 @@
   "default": false,
   "requires": [],
   "notes": [
-    "For a repo that is a tool: it holds no experiments, except comparison units under sims/ and datasets/ that compare the tool with other tools (TOOL_VERSIONING.md §1a). Before tagging a release, and in CI, run: python3 .agents/tools/release-check"
+    "For a repo that is a tool: it holds no experiments, except comparison units under sims/ and datasets/ that compare the tool with other tools (TOOL_VERSIONING.md §1a), and benches under benches/ that run against pinned reference implementations (§1b). Before tagging a release, and in CI, run: python3 .agents/tools/release-check"
   ]
 }

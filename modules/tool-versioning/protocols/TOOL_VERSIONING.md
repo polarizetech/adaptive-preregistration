@@ -4,7 +4,8 @@
 **Status of this file:** binding. If a task conflicts with it, stop and say so before doing the task.
 **For:** tool repos (libraries, instruments, acquisition bridges, file-format code) whose output other people's
 research consumes. A tool repo holds no experiments except **comparison units** (§1a): sims and dataset
-analyses that compare the tool's functionality against other tools. It has the `prereg` module too, which
+analyses that compare the tool's functionality against other tools, and **benches** (§1b) that check it
+against pinned reference implementations as part of its tests. It has the `prereg` module too, which
 scopes the tool's scientific features claim first (`SCOPE_PROTOCOL.md`); this protocol governs the tool's
 versions and releases, and nothing in the tool itself is preregistered outside its comparison units (§8).
 **Installed by:** the KIT Adaptive Preregistration `tool-versioning` module, which also adds the one-line rule to `AGENTS.md`.
@@ -18,8 +19,10 @@ versions and releases, and nothing in the tool itself is preregistered outside i
    measurements of anyone's particular device or subjects, no `experiments/` or `preregistrations/` at the root.
    The one exception is comparison units (§1a): `sims/<slug>/` and `datasets/<slug>/` that preregister
    predictions about the tool's output against other tools on declared inputs and check whether each run is
-   correct, as an extension of the test suite. Findings about the world live in the research repo that
-   produced them, which cites the tool's version.
+   correct, as an extension of the test suite; and benches (§1b), `benches/<slug>/`, which check the tool
+   against reference implementations in other repos, pinned by tag, within tolerances the owner fixed before
+   scoring. Findings about the world live in the research repo that produced them, which cites the tool's
+   version.
 2. **One version, tagged.** SemVer, `0.MINOR.PATCH` until 1.0. The version lives in one place and is mirrored in
    `CITATION.cff` (and `TOOL.toml`, if the repo has one); they all agree. Every release is an annotated tag `vX.Y.Z` with the ISO date in its message,
    pushed, and never moved or deleted.
@@ -85,6 +88,69 @@ A comparison result is evidence about the tool's behaviour at a version. It is n
 not written to the research corpus; a study that relies on it cites the unit, its EID and the tool version, or
 reruns it.
 
+## 1b. Comparison benches
+
+A **bench** (`benches/<slug>/`) is a comparison that runs like part of the test suite: it drives the tool and
+one or more **reference implementations that live in another repository**, pinned by tag, on fixed inputs,
+and passes or fails against tolerances the tool's owner chose before scoring. A bench is a test, not an
+experiment: it has no claim and no `preregistrations/`. A comparison whose outcome is uncertain, or that is
+meant to support a claim, is an experiment in a comparison unit (§1a); a bench is for agreement the owner
+expects and wants kept. A comparison unit may graduate to a bench once its result is known: the bench cites
+the unit and its EID.
+
+Each bench:
+
+- **declares its references** in its `SCOPE.toml`, one `[[references]]` table per external reference:
+
+  ```toml
+  format = 3
+  unit = "mso-vs-goldwyn"
+  kind = "bench"
+  compares = ["teeter-neuron 0.4.0", "mso-goldwyn mso-goldwyn/v0.1.0"]
+
+  [[references]]
+  name = "mso-goldwyn"                         # how tolerances and results name it
+  repo = "polarizetech/audio-evoked-potentials"
+  tag = "mso-goldwyn/v0.1.0"                   # a tag, never a branch
+  commit = "<the tag's full 40-character commit>"
+  subdirectory = "sims/mso-goldwyn"            # where in the repo the reference is, if not at its root
+  licence = "MIT"                              # the reference's licence, as its repo states it
+  runs = "python"                              # python: installed in the bench's environment and imported
+  package = "mso-goldwyn"                      #   (its distribution name)
+  # runs = "process"                           # process: a separate program, never imported or linked
+  # command = "octave --no-gui --eval run_case" #   (how it is invoked)
+  ```
+
+  `commit` makes a moved tag visible: the bench refuses to score if the code it fetched or installed is at
+  another commit. A reference never comes from a branch, a local checkout or a vendored copy.
+- **keeps its own environment.** A bench has its own dependency file (for Python, its own `pyproject.toml`).
+  A `runs = "python"` reference is pinned there at the same tag (`pkg @ git+https://…@<tag>#subdirectory=…`,
+  or the equivalent `[tool.uv.sources]` entry with `tag =`). None of a bench's dependencies is a runtime
+  dependency of the tool, and the tool never imports a bench (§5).
+- **respects the reference's licence.** Code under a licence the tool can't take on (GPL code in an MIT
+  tool, for instance) is `runs = "process"`: fetched at its tag into a cache the repo ignores, run as a
+  separate process (Octave, a CLI, a container) that exchanges files with the bench, and never copied into
+  the repo, imported or linked. The bench's results are data and stay under the tool's terms.
+- **fixes its tolerances before scoring.** `tolerances.toml` names, for each metric and reference, the bound
+  it must meet (`at_most` or `at_least`) and why, with who decided them (`decided_by`, a person) and when
+  (`decided`). The owner chooses them; an assistant may propose values, never decide them. The bench scores
+  nothing until they are decided and committed. A tolerance changed after a result was seen is a new
+  decision: the owner records it in a `[[revisions]]` entry (the old value, the new one, why, the date), and
+  the bench is re-run.
+- **keeps its results in the unit**: one `results/<tool version>.json` per scored run, recording the tool's
+  version and commit (and whether its tree had uncommitted changes), every reference's tag and the commit it
+  ran, the hash of the `tolerances.toml` it scored against, each metric's value and bound, and pass or fail.
+  A result scored against tolerances that have since changed is stale.
+- **is re-run on every release**, and whenever an `### Outputs changed` line touches what it compares
+  (§3), which names it like a consumer. The release commit carries the bench's result for that version. A
+  failing bench blocks the release unless the release's `CHANGELOG.md` entry names it under `### Benches`
+  with why the release goes ahead (an accepted divergence, a reference bug); its result stays as it is.
+- **is listed** in `TOOL.toml` under `[[comparisons]]` with `kind = "bench"`, beside the comparison units.
+
+A passing bench is evidence that the tool agrees with its references at a version, within the stated bounds.
+Like a comparison result, it is not a research finding: a study that relies on it cites the bench, its
+result file and the tool version.
+
 ---
 
 ## 2. Versions and tags
@@ -128,7 +194,8 @@ consumer parses.
   ```
 
   Each line names the function, route, field or constant, the old and new behaviour, and the consumers from
-  the Consumers list (§4) and the comparison units (§1a) that must re-run, or `none`.
+  the Consumers list (§4), the comparison units (§1a) and the benches (§1b) that must re-run, or `none`.
+- A bench that fails at the release is named under `### Benches`, with why the release goes ahead (§1b).
 - An `### Outputs changed` section is never empty. A release with no output change leaves the section out.
 
 ---
@@ -232,7 +299,9 @@ docs may link to either, with the tag it tested.
 1. `CHANGELOG.md`: move the `[Unreleased]` entries under `## [X.Y.Z] — YYYY-MM-DD`; add `### Outputs changed`
    if any output changed (§3), naming the consumers to re-run (§4).
 2. Bump the version source and `CITATION.cff` (`version`, `date-released`) in the same commit.
-3. Run the tests, including the one-way dependency test (§5), and `python3 .agents/tools/release-check`.
+3. Run the tests, including the one-way dependency test (§5), then every bench (§1b) at the new version,
+   committing each bench's `results/<version>.json` (name any that fails under `### Benches`), then
+   `python3 .agents/tools/release-check`.
 4. `git tag -a vX.Y.Z -m "YYYY-MM-DD <summary>"`, then push the commit and the tag.
 5. Tell the consumers listed under `### Outputs changed`.
 
@@ -245,7 +314,11 @@ docs may link to either, with the tag it tested.
 - there is no `experiments/` or `preregistrations/` at the repo root, and no `preregistrations/` anywhere
   except directly inside a comparison unit (`sims/<slug>/` or `datasets/<slug>/`);
 - every comparison unit has a `SCOPE.toml` whose `compares` names the tool and at least one other tool;
-- a root `EXPERIMENTS.md` exists only when the repo has comparison units.
+- a root `EXPERIMENTS.md` exists only when the repo has comparison units;
+- every bench (`benches/<slug>/`) holds no `preregistrations/`, declares at least one `[[references]]` with a
+  tag that is not a branch name and a full commit, and has a `tolerances.toml` once it has results;
+- at a released version, every bench has `results/<version>.json`, and one that failed is named under
+  `### Benches` in that version's `CHANGELOG.md` entry.
 
 It exits 1 if any check fails. Run it before tagging and in CI. It can't tell whether an output changed; that
 is the author's judgement, recorded in the changelog.
