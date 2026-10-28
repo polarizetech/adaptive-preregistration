@@ -7,7 +7,10 @@
   - CHANGELOG.md has a heading for that version;
   - if the heading is dated (released), the annotated tag v<version> exists and its message has an ISO date;
   - a PATCH release (X.Y.Z with Z > 0) has no "### Outputs changed" section;
-  - there is no EXPERIMENTS.md, experiments/ or preregistrations/ at the repo root.
+  - there is no experiments/ or preregistrations/ at the repo root, and no preregistrations/ anywhere except
+    directly inside a comparison unit (sims/<slug>/ or datasets/<slug>/, TOOL_VERSIONING.md §1a);
+  - every comparison unit has a SCOPE.toml whose `compares` names the tool and at least one other tool;
+  - a root EXPERIMENTS.md exists only when the repo has comparison units.
 
 usage: .agents/tools/release-check [--repo PATH]
 Exits 1 if any check fails, 0 otherwise. Not a hook: run it before tagging a release, and in CI.
@@ -19,6 +22,10 @@ SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]
 ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 VERSION_ASSIGN = re.compile(r"""^version\s*=\s*["']([^"']+)["']""", re.M)
 DUNDER = re.compile(r"""^__version__\s*(?::\s*str\s*)?=\s*["']([^"']+)["']""", re.M)
+COMPARES = re.compile(r"^compares\s*=\s*\[(.*?)\]", re.M | re.S)
+#: Folders that hold a tool repo's comparison units (TOOL_VERSIONING.md §1a), and folders never searched.
+COMPARISON_DIRS = ("sims", "datasets")
+SKIP_DIRS = {".git", ".agents", "node_modules", ".venv", "venv", "__pycache__"}
 
 
 def git(repo, *args):
@@ -93,6 +100,54 @@ def changelog_entry(text, version):
     return m.group(0), text[m.end():m.end() + nxt.start()] if nxt else text[m.end():]
 
 
+def comparison_units(repo):
+    """sims/<slug>/ and datasets/<slug>/ folders that are units: they have a SCOPE.toml or preregistrations/."""
+    units = []
+    for kind in COMPARISON_DIRS:
+        base = os.path.join(repo, kind)
+        if not os.path.isdir(base):
+            continue
+        for name in sorted(os.listdir(base)):
+            path = os.path.join(base, name)
+            if os.path.isdir(path) and (os.path.exists(os.path.join(path, "SCOPE.toml"))
+                                        or os.path.isdir(os.path.join(path, "preregistrations"))):
+                units.append(f"{kind}/{name}")
+    return units
+
+
+def compared(scope_text):
+    """The strings in SCOPE.toml's `compares = [...]`, which may span lines."""
+    m = COMPARES.search(scope_text or "")
+    return re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(1)) if m else []
+
+
+def check_comparisons(repo):
+    fails = []
+    units = comparison_units(repo)
+    for rel in ("experiments", "preregistrations"):
+        if os.path.lexists(os.path.join(repo, rel)):
+            fails.append(f"{rel} exists at the root; a tool holds no experiments outside its comparison units "
+                         "(sims/<slug>/, datasets/<slug>/; TOOL_VERSIONING.md §1a)")
+    for dirpath, dirnames, _ in os.walk(repo):
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
+        if "preregistrations" in dirnames:
+            unit = os.path.relpath(dirpath, repo).replace(os.sep, "/")
+            if unit != "." and unit not in units:
+                fails.append(f"{unit}/preregistrations exists; preregistrations belong directly inside a comparison "
+                             "unit (sims/<slug>/ or datasets/<slug>/)")
+            dirnames.remove("preregistrations")
+    for unit in units:
+        scope = read(os.path.join(repo, unit, "SCOPE.toml"))
+        if scope is None:
+            fails.append(f"{unit} has preregistrations/ but no SCOPE.toml naming what it compares")
+        elif len(compared(scope)) < 2:
+            fails.append(f"{unit}/SCOPE.toml needs compares = [\"<this tool>\", \"<other tool> <version>\", ...]: "
+                         "a comparison unit compares the tool with at least one other tool")
+    if os.path.lexists(os.path.join(repo, "EXPERIMENTS.md")) and not units:
+        fails.append("EXPERIMENTS.md exists, but the repo has no comparison units; a tool holds no other experiments")
+    return fails
+
+
 def check(repo):
     fails, notes = [], []
     version, where = version_source(repo)
@@ -143,9 +198,7 @@ def check(repo):
                 else:
                     notes.append(f"{version} not released yet (its CHANGELOG heading has no date)")
 
-    for rel in ("EXPERIMENTS.md", "experiments", "preregistrations"):
-        if os.path.lexists(os.path.join(repo, rel)):
-            fails.append(f"{rel} exists; a tool holds no experiments (they belong in a research repo)")
+    fails += check_comparisons(repo)
     return fails, notes
 
 

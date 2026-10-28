@@ -7,6 +7,22 @@ there.
 
 ## Unreleased
 
+- **A tool repo may hold comparison units.** `sims/<slug>/` and `datasets/<slug>/` are allowed in a tool repo
+  "as long as they are about comparing the tool's functionality against other tools (aka preregistering
+  predictions based on inputs and seeing if the run is correct - essentially treating these like an extension
+  on the test suite)" (the person's wording, 2026-10-24). `TOOL_VERSIONING.md` gains §1a; rules 1 and 8, §3, §8
+  and §9 now name the exception; `SCOPE_PROTOCOL.md` §1 and `PREREG_PROTOCOL.md` §1 treat each comparison unit
+  as a unit of its own beside the tool. A comparison unit's `SCOPE.toml` says what it `compares` (the tool and
+  at least one other tool); its predictions are about tool outputs on declared inputs, never about the world;
+  its preregistrations and results stay inside it; a root `EXPERIMENTS.md` lists comparison units only; its
+  extra dependencies stay out of the tool's runtime dependencies; and an output change that touches it names
+  it under `### Outputs changed`, like a consumer. `release-check` allows `preregistrations/` directly inside a
+  comparison unit (and nowhere else), requires its `compares`, and allows a root `EXPERIMENTS.md` only when the
+  repo has comparison units. `scope-status` keeps a tool repo itself as a unit beside its comparison units.
+  **Behaviour in installed projects:** yes, after update, in tool repos only. `release-check` no longer fails
+  a root `EXPERIMENTS.md` when comparison units exist, and fails a comparison unit with no `compares`.
+  Assistants may build comparison sims and dataset analyses in a tool repo. Nothing changes in studies.
+
 - **An app version is found at `apps/<slug>/<version>`.** A study manifest's `[[apps]]` entry with no `path`
   is looked for there first, and then at the earlier `apps/<version>-<slug>`, so a study laid out either way
   has its apps found by `scope-status`. Where a study keeps its units is still the organisation's convention,
