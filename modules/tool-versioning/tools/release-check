@@ -15,7 +15,7 @@
     preregistrations/, declares
     [[references]] each with a tag that is not a branch name and a full commit, and has a tolerances.toml
     once it has results/;
-  - at a released version, every bench sim has results/<version>.json, and one that failed is named under
+  - at a released version, every bench sim in its tag has results/<version>.json, and one that failed is named under
     "### Benches" in that version's CHANGELOG entry.
 
 usage: .agents/tools/release-check [--repo PATH]
@@ -203,6 +203,10 @@ def check_benches(repo, version, released, body):
         if scored and not os.path.exists(os.path.join(path, "tolerances.toml")):
             fails.append(f"{bench} has results but no tolerances.toml; tolerances are fixed before scoring")
         if version and released:
+            code, _ = git(repo, "cat-file", "-t", f"refs/tags/v{version}")
+            if not code and git(repo, "cat-file", "-e", f"v{version}:{bench}/SCOPE.toml")[0]:
+                notes.append(f"{bench} was added after v{version}; it needs a result at the next release")
+                continue
             result = os.path.join(results, f"{version}.json")
             text = read(result)
             if text is None:
@@ -215,7 +219,8 @@ def check_benches(repo, version, released, body):
                 continue
             if passed is not True:
                 section = re.search(r"^###\s+Benches\b(.*?)(?=^###?\s|\Z)", body or "", re.M | re.S)
-                if not (section and bench in section.group(1)):
+                named = section and re.search(rf"(?<![\w/.-]){re.escape(bench)}(?![\w/.-])", section.group(1))
+                if not named:
                     fails.append(f"{bench} failed at {version}; name it under ### Benches in the CHANGELOG entry, "
                                  "with why the release goes ahead, or fix it")
                 else:

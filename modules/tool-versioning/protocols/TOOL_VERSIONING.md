@@ -321,7 +321,7 @@ docs may link to either, with the tag it tested.
 - every bench sim (`sims/<slug>/` with `kind = "bench"`) holds no `preregistrations/`, declares at least one
   `[[references]]` with a tag that is not a branch name and a full commit, and has a `tolerances.toml` once
   it has results;
-- at a released version, every bench sim has `results/<version>.json`, and one that failed is named under
+- at a released version, every bench sim that is in its tag has `results/<version>.json`, and one that failed is named under
   `### Benches` in that version's `CHANGELOG.md` entry.
 
 It exits 1 if any check fails. Run it before tagging and in CI. It can't tell whether an output changed; that

@@ -674,10 +674,10 @@ class ToolVersioningTest(KitBase):
         self.assertEqual(r.returncode, 0, r.stdout)
 
     def test_a_release_carries_every_bench_result(self):
-        self.tool_repo()
-        sh("git", "tag", "-a", "v0.2.0", "-m", "2026-09-20 first minor", cwd=self.repo)
         self.write("sims/vs-ref/SCOPE.toml", self.BENCH_SCOPE)
         self.write("sims/vs-ref/tolerances.toml", 'decided_by = "owner"\n')
+        self.tool_repo()
+        sh("git", "tag", "-a", "v0.2.0", "-m", "2026-09-20 first minor", cwd=self.repo)
         self.assertIn("sims/vs-ref has no results/0.2.0.json", self.release_check().stdout)
         self.write("sims/vs-ref/results/0.2.0.json", '{"passed": false}\n')
         self.assertIn("sims/vs-ref failed at 0.2.0", self.release_check().stdout)
@@ -690,6 +690,22 @@ class ToolVersioningTest(KitBase):
         self.assertIn("named under ### Benches", r.stdout)
         self.write("sims/vs-ref/results/0.2.0.json", '{"passed": true}\n')
         self.assertEqual(self.release_check().returncode, 0)
+
+    def test_a_bench_added_after_a_release_waits_for_the_next(self):
+        self.tool_repo()
+        sh("git", "tag", "-a", "v0.2.0", "-m", "2026-09-20 first minor", cwd=self.repo)
+        self.write("sims/vs-ref/SCOPE.toml", self.BENCH_SCOPE)
+        r = self.release_check()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("sims/vs-ref was added after v0.2.0", r.stdout)
+
+    def test_benches_section_names_the_exact_bench(self):
+        self.write("sims/vs-ref/SCOPE.toml", self.BENCH_SCOPE)
+        self.write("sims/vs-ref/tolerances.toml", 'decided_by = "owner"\n')
+        self.write("sims/vs-ref/results/0.2.0.json", '{"passed": false}\n')
+        self.tool_repo(heading="## [0.2.0] — 2026-09-20\n\n### Benches\n- sims/vs-ref2: unrelated")
+        sh("git", "tag", "-a", "v0.2.0", "-m", "2026-09-20 first minor", cwd=self.repo)
+        self.assertIn("sims/vs-ref failed at 0.2.0", self.release_check().stdout)
 
     def test_a_patch_may_not_change_outputs(self):
         self.tool_repo(version="0.2.1", heading="## [0.2.1]\n\n### Outputs changed\n- `rate` now measured")
