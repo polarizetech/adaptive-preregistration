@@ -10,13 +10,19 @@
   - there is no experiments/ or preregistrations/ at the repo root, and no preregistrations/ anywhere except
     directly inside a comparison unit (sims/<slug>/ or datasets/<slug>/, TOOL_VERSIONING.md §1a);
   - every comparison unit has a SCOPE.toml whose `compares` names the tool and at least one other tool;
-  - a root EXPERIMENTS.md exists only when the repo has comparison units.
+  - a root EXPERIMENTS.md exists only when the repo has comparison units;
+  - every bench sim (sims/<slug>/ whose SCOPE.toml says kind = "bench", TOOL_VERSIONING.md §1b) holds no
+    preregistrations/, declares
+    [[references]] each with a tag that is not a branch name and a full commit, and has a tolerances.toml
+    once it has results/;
+  - at a released version, every bench sim in its tag has results/<version>.json, and one that failed is named under
+    "### Benches" in that version's CHANGELOG entry.
 
 usage: .agents/tools/release-check [--repo PATH]
 Exits 1 if any check fails, 0 otherwise. Not a hook: run it before tagging a release, and in CI.
 Stdlib only (Python 3.9+).
 """
-import argparse, os, re, subprocess, sys
+import argparse, json, os, re, subprocess, sys
 
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
 ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
@@ -25,6 +31,10 @@ DUNDER = re.compile(r"""^__version__\s*(?::\s*str\s*)?=\s*["']([^"']+)["']""", r
 COMPARES = re.compile(r"^compares\s*=\s*\[(.*?)\]", re.M | re.S)
 #: Folders that hold a tool repo's comparison units (TOOL_VERSIONING.md §1a), and folders never searched.
 COMPARISON_DIRS = ("sims", "datasets")
+#: A bench sim (TOOL_VERSIONING.md §1b) says so before its SCOPE.toml's first table; refs that name a branch.
+BENCH_KIND = re.compile(r'^kind\s*=\s*"bench"\s*(#.*)?$', re.M)
+BRANCH_REFS = {"", "main", "master", "HEAD", "develop", "dev", "trunk"}
+FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SKIP_DIRS = {".git", ".agents", "node_modules", ".venv", "venv", "__pycache__"}
 
 
@@ -148,8 +158,79 @@ def check_comparisons(repo):
     return fails
 
 
+def benches(repo):
+    """Bench sims (TOOL_VERSIONING.md §1b): sims/<slug>/ whose SCOPE.toml says kind = "bench"."""
+    base = os.path.join(repo, "sims")
+    found = []
+    for name in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+        scope = read(os.path.join(base, name, "SCOPE.toml")) or ""
+        if BENCH_KIND.search(re.split(r"^\[", scope, maxsplit=1, flags=re.M)[0]):
+            found.append(f"sims/{name}")
+    return found
+
+
+def references(scope_text):
+    """The [[references]] tables of a bench sim's SCOPE.toml, as dicts of their string values."""
+    refs = []
+    for m in re.finditer(r"^\[\[references\]\]\s*$(.*?)(?=^\[|\Z)", scope_text or "", re.M | re.S):
+        refs.append(dict(re.findall(r'^(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', m.group(1), re.M)))
+    return refs
+
+
+def check_benches(repo, version, released, body):
+    """TOOL_VERSIONING.md §1b: what a bench sim declares, and its result at a released version."""
+    fails, notes = [], []
+    for bench in benches(repo):
+        path = os.path.join(repo, bench)
+        if os.path.isdir(os.path.join(path, "preregistrations")):
+            fails.append(f"{bench}/preregistrations exists; a bench sim's tolerances are its preregistration "
+                         "(a comparison that is an experiment is a comparison unit without kind = \"bench\")")
+        scope = read(os.path.join(path, "SCOPE.toml"))
+        refs = references(scope)
+        if scope is None or not refs:
+            fails.append(f"{bench} declares no [[references]] in SCOPE.toml (repo, tag, commit, licence, runs)")
+        for i, ref in enumerate(refs, 1):
+            label = f"{bench} reference {ref.get('name') or i}"
+            for key in ("name", "repo", "licence", "runs"):
+                if not ref.get(key):
+                    fails.append(f"{label} has no {key}")
+            if ref.get("tag", "") in BRANCH_REFS or not re.search(r"\d", ref.get("tag", "")):
+                fails.append(f"{label}: tag {ref.get('tag', '')!r} is not a release tag; pin a tag, never a branch")
+            if not FULL_SHA.match(ref.get("commit", "")):
+                fails.append(f"{label}: commit must be the tag's full 40-character commit")
+        results = os.path.join(path, "results")
+        scored = sorted(f for f in os.listdir(results) if f.endswith(".json")) if os.path.isdir(results) else []
+        if scored and not os.path.exists(os.path.join(path, "tolerances.toml")):
+            fails.append(f"{bench} has results but no tolerances.toml; tolerances are fixed before scoring")
+        if version and released:
+            code, _ = git(repo, "cat-file", "-t", f"refs/tags/v{version}")
+            if not code and git(repo, "cat-file", "-e", f"v{version}:{bench}/SCOPE.toml")[0]:
+                notes.append(f"{bench} was added after v{version}; it needs a result at the next release")
+                continue
+            result = os.path.join(results, f"{version}.json")
+            text = read(result)
+            if text is None:
+                fails.append(f"{bench} has no results/{version}.json; every bench sim is run when a version is tagged")
+                continue
+            try:
+                passed = json.loads(text).get("passed")
+            except ValueError:
+                fails.append(f"{bench}/results/{version}.json is not JSON")
+                continue
+            if passed is not True:
+                section = re.search(r"^###\s+Benches\b(.*?)(?=^###?\s|\Z)", body or "", re.M | re.S)
+                named = section and re.search(rf"(?<![\w/.-]){re.escape(bench)}(?![\w/.-])", section.group(1))
+                if not named:
+                    fails.append(f"{bench} failed at {version}; name it under ### Benches in the CHANGELOG entry, "
+                                 "with why the release goes ahead, or fix it")
+                else:
+                    notes.append(f"{bench} failed at {version} (named under ### Benches)")
+    return fails, notes
+
+
 def check(repo):
     fails, notes = [], []
+    released, body = False, None
     version, where = version_source(repo)
     if version is None:
         fails.append(where)
@@ -183,6 +264,7 @@ def check(repo):
                     fails.append(f"{version} is a PATCH release but its CHANGELOG entry has '### Outputs changed'; "
                                  "output changes need a new MINOR")
                 if ISO_DATE.search(heading):
+                    released = True
                     tag = f"v{version}"
                     code, kind = git(repo, "cat-file", "-t", f"refs/tags/{tag}")
                     if code:
@@ -199,7 +281,8 @@ def check(repo):
                     notes.append(f"{version} not released yet (its CHANGELOG heading has no date)")
 
     fails += check_comparisons(repo)
-    return fails, notes
+    bench_fails, bench_notes = check_benches(repo, version, released, body)
+    return fails + bench_fails, notes + bench_notes
 
 
 def main():
