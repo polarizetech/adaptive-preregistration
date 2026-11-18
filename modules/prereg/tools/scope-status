@@ -23,6 +23,10 @@ BASES = ("established", "supported", "derived", "override", "gap")
 DECISIONS = ("use-research", "override", "research-further")
 OUTCOME_KNOWN = ("no", "partial", "yes")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# A bench sim (TOOL_VERSIONING.md §1b): no stage and no claim; its tolerances.toml is its preregistration.
+BENCH_REF_KEYS = ("name", "repo", "tag", "commit", "licence", "runs")
+BENCH_RUNS = ("python", "process")
+COMMIT = re.compile(r"^[0-9a-f]{40}$")
 # A corpus claim ID, or a DOI or URL followed by how deeply it was read.
 SOURCE = re.compile(r"^(claim:\S+|(doi:10\.\S+|https?://\S+) \[(FT|AB)\])$")
 SKIP_DIRS = {".git", ".agents", "node_modules", ".venv", "venv", "__pycache__"}
@@ -206,6 +210,25 @@ def assess(rec):
         errors.append("format must be 1, 2 or 3")
     if not unit_name(rec):
         errors.append("unit is empty" if rec.get("format") != 1 else "tool is empty")
+    if rec.get("kind") == "bench":
+        if not items(rec, "compares"):
+            errors.append("a bench needs `compares`")
+        refs = items(rec, "references")
+        if not refs:
+            errors.append("a bench needs at least one [[references]]")
+        for i, ref in enumerate(refs, 1):
+            where = f"references #{i}"
+            if not isinstance(ref, dict):
+                errors.append(f"{where} must be a table ([[references]])")
+                continue
+            for key in BENCH_REF_KEYS:
+                if not text(ref, key):
+                    errors.append(f"{where}: `{key}` is empty")
+            if text(ref, "commit") and not COMMIT.match(text(ref, "commit")):
+                errors.append(f"{where}: commit must be the tag's full 40-character commit")
+            if text(ref, "runs") and text(ref, "runs") not in BENCH_RUNS:
+                errors.append(f"{where}: runs must be one of {', '.join(BENCH_RUNS)}")
+        return errors, open_items, blocked, gaps_to_production
     stage = stage_of(rec)
     if stage is None:
         allowed = OLD_STAGES if rec.get("format") in (1, 2) else STAGES
@@ -321,7 +344,9 @@ def is_ready(rec, errors, before_production):
 def report(path, rec, errors, open_items, blocked, before_production):
     claim = rec.get("claim") if isinstance(rec.get("claim"), dict) else {}
     stage = stage_of(rec)
-    out = [f"{path}: {unit_name(rec) or '(no unit name)'} ({stage or rec.get('stage', '?')})"]
+    bench = rec.get("kind") == "bench"
+    label = "bench" if bench else (stage or rec.get("stage", "?"))
+    out = [f"{path}: {unit_name(rec) or '(no unit name)'} ({label})"]
     if stage == "exploratory":
         note = rec.get("exploration") if isinstance(rec.get("exploration"), dict) else {}
         if text(note, "building"):
@@ -351,7 +376,10 @@ def report(path, rec, errors, open_items, blocked, before_production):
         if lines:
             out.append(f"  {title}:")
             out.extend(f"    - {line}" for line in lines)
-    if stage == "exploratory":
+    if bench:
+        if not errors:
+            out.append("  Nothing open: a bench's tolerances.toml is its preregistration (TOOL_VERSIONING.md §1b).")
+    elif stage == "exploratory":
         if not (errors or open_items):
             out.append("  Nothing open at this stage.")
     elif not (errors or before_production):

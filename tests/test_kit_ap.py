@@ -739,6 +739,22 @@ class ToolVersioningTest(KitBase):
         self.assertIn("TOOL.toml version 0.4.0 != 0.5.0", r.stdout)
 
 
+BENCH_RECORD = """format = 3
+unit = "mso-vs-goldwyn"
+kind = "bench"
+compares = ["teeter-neuron 0.4.0", "mso-goldwyn mso-goldwyn/v0.1.0"]
+
+[[references]]
+name = "mso-goldwyn"
+repo = "polarizetech/audio-evoked-potentials"
+tag = "mso-goldwyn/v0.1.0"
+commit = "0123456789abcdef0123456789abcdef01234567"
+licence = "MIT"
+runs = "python"
+package = "mso-goldwyn"
+"""
+
+
 class ScopeStatusTest(unittest.TestCase):
     """scope-status implements the record contract in SCOPE_PROTOCOL.md section 9."""
 
@@ -815,6 +831,33 @@ class ScopeStatusTest(unittest.TestCase):
         for message, record in cases.items():
             with self.subTest(message):
                 self.assertNotEqual(record, SCOPE_RECORD, "fixture replacement didn't apply")
+                r = self.status(record, "--check")
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertIn(message, r.stdout)
+
+    def test_bench_record_needs_no_stage_or_claim(self):
+        """A bench sim has no claim and no stage (TOOL_VERSIONING.md §1b)."""
+        r = self.status(BENCH_RECORD, "--check")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertNotIn("Errors", r.stdout)
+        self.assertNotIn("stage must be one of", r.stdout)
+        self.assertNotIn("claim isn't settled", r.stdout)
+        self.assertIn("mso-vs-goldwyn (bench)", r.stdout)
+
+    def test_bench_record_contract_errors(self):
+        cases = {
+            "a bench needs `compares`": BENCH_RECORD.replace(
+                'compares = ["teeter-neuron 0.4.0", "mso-goldwyn mso-goldwyn/v0.1.0"]\n', ""),
+            "a bench needs at least one [[references]]": BENCH_RECORD.split("[[references]]")[0],
+            "references #1: `tag` is empty": BENCH_RECORD.replace('tag = "mso-goldwyn/v0.1.0"\n', ""),
+            "references #1: commit must be the tag's full 40-character commit": BENCH_RECORD.replace(
+                "0123456789abcdef0123456789abcdef01234567", "0123456"),
+            "references #1: runs must be one of python, process": BENCH_RECORD.replace(
+                'runs = "python"', 'runs = "docker"'),
+        }
+        for message, record in cases.items():
+            with self.subTest(message):
+                self.assertNotEqual(record, BENCH_RECORD, "fixture replacement didn't apply")
                 r = self.status(record, "--check")
                 self.assertEqual(r.returncode, 1, r.stdout)
                 self.assertIn(message, r.stdout)
