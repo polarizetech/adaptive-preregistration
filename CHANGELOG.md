@@ -24,6 +24,12 @@ there.
   a bench sim only: `release-check` fails one without pinned references, results without tolerances, and a
   release without its passing (or named) result. Nothing changes elsewhere.
 
+- **scope-status reads bench sims.** A `SCOPE.toml` with `kind = "bench"` is no longer asked for a stage or a
+  claim (TOOL_VERSIONING.md §1b); scope-status checks its `compares` and each `[[references]]` (name, repo, tag,
+  licence, `runs` of python or process, and the tag's full 40-character commit) and labels it `(bench)`.
+  **Behaviour in installed projects:** a bench sim that used to fail `scope-status --check` on its missing stage
+  now passes when its references are complete.
+
 - **A tool repo may hold comparison units.** `sims/<slug>/` and `datasets/<slug>/` are allowed in a tool repo
   "as long as they are about comparing the tool's functionality against other tools (aka preregistering
   predictions based on inputs and seeing if the run is correct - essentially treating these like an extension
